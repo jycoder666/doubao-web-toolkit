@@ -25,7 +25,8 @@
       ],
       "js": ["content/content-loader.js"],
       "css": ["content/styles/common.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "type": "module"
     }
   ],
   "background": {
