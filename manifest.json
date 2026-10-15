@@ -4,9 +4,19 @@
   "short_name": "doubao-toolkit",
   "version": "0.1.0",
   "description": "Chrome/Edge extension for doubao.com: 调试面板、批量输入+验证码暂停、对话导出、选择器注册表",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Doubao Web Toolkit"
+    "default_title": "Doubao Web Toolkit",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "options_ui": {
     "page": "options/options.html",

@@ -1,1 +1,35 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Doubao Web Toolkit</title><link rel="stylesheet" href="popup.css"></head><body><div class="wrap"><h1>Doubao Web Toolkit</h1><div class="section"><button id="open-debug">打开调试面板</button><button id="open-options">配置页</button></div><div id="status"></div></div><script src="popup.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Doubao Web Toolkit</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="wrap">
+    <h1>Doubao Web Toolkit</h1>
+
+    <div class="section">
+      <button id="open-debug">⚙ 调试面板</button>
+      <button id="open-options">配置页</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">批量输入</div>
+      <button id="start-batch" class="primary">▶ 开始执行</button>
+      <button id="stop-batch">■ 停止</button>
+      <button id="batch-resume">⏩ 放行 / 继续</button>
+      <div id="batch-status" class="muted">未启动</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">导出对话</div>
+      <button id="export-md">📄 Markdown</button>
+      <button id="export-json">📦 JSON</button>
+    </div>
+
+    <div id="status" class="muted"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
