@@ -1,10 +1,7 @@
-// MV3 Service Worker. Short tasks only — max ~30s lifetime.
-// Storage key registry + initial install defaults + message routing.
-// NOTE: Service Worker does NOT support ES Module export/import.
-
+// MV3 Service Worker. Short tasks only.
 const KEYS = {
-  FEATURES: 'dwt_features',          // { debugPanel: true, batchInput: true, ... }
-  SELECTORS: 'dwt_selectors',        // { input, send, replyState, captcha }
+  FEATURES: 'dwt_features',
+  SELECTORS: 'dwt_selectors',
   BATCH_TEMPLATES: 'dwt_batch_templates',
   THEME: 'dwt_theme',
 };
@@ -13,11 +10,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   try {
     const existing = await chrome.storage.local.get(null);
     if (!existing[KEYS.FEATURES]) {
-      await chrome.storage.local.set({
-        [KEYS.FEATURES]: { debugPanel: true },
-      });
+      await chrome.storage.local.set({ [KEYS.FEATURES]: { debugPanel: true } });
     }
-  } catch (_) { /* storage may not be ready */ }
+  } catch (_) {}
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
