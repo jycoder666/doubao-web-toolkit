@@ -2,34 +2,26 @@
   "manifest_version": 3,
   "name": "Doubao Web Toolkit",
   "short_name": "doubao-toolkit",
-  "version": "0.0.1",
-  "description": "Chrome/Edge extension for doubao.com: 对话导出、导航、提示词条、批量输入+验证码暂停、主题美化",
-  "action": {
-    "default_popup": "popup/popup.html",
-    "default_title": "Doubao Web Toolkit"
-  },
-  "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
-  },
-  "permissions": ["storage", "scripting"],
-  "host_permissions": [
-    "https://www.doubao.com/*",
-    "https://www.dola.com/*"
-  ],
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.doubao.com/*",
-        "https://www.dola.com/*"
-      ],
-      "js": ["content/content-loader.js"],
-      "css": ["content/styles/common.css"],
-      "run_at": "document_idle",
-      "type": "module"
-    }
-  ],
-  "background": {
-    "service_worker": "background/service-worker.js"
-  }
+  "version": "0.1.0",
+  "description": "Chrome/Edge extension for doubao.com: debug panel, batch input w/ captcha pause, conversation export",
+  "action": { "default_popup": "popup/popup.html", "default_title": "Doubao Web Toolkit" },
+  "options_ui": { "page": "options/options.html", "open_in_tab": true },
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.doubao.com/*", "https://www.dola.com/*"],
+  "content_scripts": [{
+    "matches": ["https://www.doubao.com/*", "https://www.dola.com/*"],
+    "css": ["content/styles/common.css"],
+    "run_at": "document_idle",
+    "js": [
+      "content/core/selector-manager.js",
+      "content/core/dom-observer.js",
+      "content/core/reply-state.js",
+      "content/core/captcha-detector.js",
+      "content/features/batch-input/runner.js",
+      "content/features/debug-panel/module.js",
+      "content/features/batch-input/module.js",
+      "content/content-loader.js"
+    ]
+  }],
+  "background": { "service_worker": "background/service-worker.js" }
 }
