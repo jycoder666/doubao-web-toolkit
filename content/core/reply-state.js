@@ -1,19 +1,20 @@
 // reply-state.js — 豆包"是否正在生成回复"状态机
+// 关键发现 (2026-10-16 浏览器验证):
+//   豆包流式回复时, AI 消息容器会加 data-streaming="true",
+//   完成后变为 data-streaming="false".
+//   不使用 thinking/streaming/loading/typing/wait 这些 class 名 (全 0 命中).
 (function () {
   'use strict';
 
   const dwt = window.dwt = window.dwt || {};
-  const SEL = [
-    '[class*="thinking" i]',
-    '[class*="streaming" i]',
-    '[class*="loading" i]',
-    '[class*="typing" i]',
-    '[class*="wait"]',
-  ];
 
   dwt.replyState = {
+    // 主检测: data-streaming="true" (豆包 2026 年的真实实现)
+    // 兜底: 未来版本可能改回 class 标记, 保留作 fallback
     isGenerating() {
-      return SEL.some(s => document.querySelector(s) !== null);
+      if (document.querySelector('[data-streaming="true"]')) return true;
+      if (document.querySelector('[data-testid*="loading" i]')) return true;
+      return false;
     },
 
     async whenDone(opts) {
