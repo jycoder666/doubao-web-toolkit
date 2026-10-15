@@ -32,6 +32,12 @@
         "content/core/captcha-detector.js",
         "content/features/batch-input/runner.js",
         "content/features/debug-panel/module.js",
+        "content/features/export/module.js",
+        "content/features/theme/module.js",
+        "content/features/prompt-bar/module.js",
+        "content/features/navigator/module.js",
+        "content/features/enhance/module.js",
+        "content/features/source-inspector/module.js",
         "content/features/batch-input/module.js",
         "content/content-loader.js"
       ]
