@@ -3,7 +3,11 @@
 (function () {
   'use strict';
 
-  const { selectorManager, replyState, captchaDetector } = window.dwt;
+  // 安全访问: 用可选链避免硬依赖加载顺序
+  const dwt = window.dwt || {};
+  const selectorManager = dwt.selectorManager;
+  const replyState = dwt.replyState;
+  const captchaDetector = dwt.captchaDetector;
 
   function dispatchInput(text) {
     const pm = selectorManager.getInput();
@@ -29,14 +33,16 @@
       this.state = 'IDLE';
       this.stopFlag = false;
       this._cb = null;
-      captchaDetector.start();
-      window.addEventListener('dwt-captcha-change', (e) => {
-        if (e.detail.detected && this.state !== 'PAUSED_BY_CAPTCHA') {
-          this.state = 'PAUSED_BY_CAPTCHA';
-          this._emit();
-          chrome.runtime.sendMessage({ type: 'BATCH_CAPTCHA_DETECTED' }).catch(() => {});
-        }
-      });
+      if (captchaDetector) {
+        captchaDetector.start();
+        window.addEventListener('dwt-captcha-change', (e) => {
+          if (e.detail.detected && this.state !== 'PAUSED_BY_CAPTCHA') {
+            this.state = 'PAUSED_BY_CAPTCHA';
+            this._emit();
+            chrome.runtime.sendMessage({ type: 'BATCH_CAPTCHA_DETECTED' }).catch(() => {});
+          }
+        });
+      }
     }
 
     onEvent(fn) { this._cb = fn; }
@@ -44,11 +50,14 @@
 
     waitForResume() {
       return new Promise((resolve) => {
-        const handler = (msg) => {
+        const handler = (msg, sender, sendResponse) => {
           if (msg && msg.type === 'BATCH_RESUME') {
             chrome.runtime.onMessage.removeListener(handler);
+            sendResponse({ ok: true });
             resolve();
+            return true;
           }
+          return false;
         };
         chrome.runtime.onMessage.addListener(handler);
       });
@@ -68,7 +77,7 @@
         }
 
         // 验证码暂停
-        if (captchaDetector.isDetected()) {
+        if (captchaDetector && captchaDetector.isDetected()) {
           this.state = 'PAUSED_BY_CAPTCHA'; this._emit();
           await this.waitForResume();
           if (captchaDetector.isDetected()) {
@@ -100,10 +109,10 @@
         }
       }
       this.state = 'DONE'; this._emit();
-      captchaDetector.stop();
+      if (captchaDetector) captchaDetector.stop();
     }
 
-    stop() { this.stopFlag = true; this.state = 'DONE'; this._emit(); captchaDetector.stop(); }
+    stop() { this.stopFlag = true; this.state = 'DONE'; this._emit(); if (captchaDetector) captchaDetector.stop(); }
   }
 
   window.BatchRunner = BatchRunner;
