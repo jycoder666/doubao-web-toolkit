@@ -14,9 +14,8 @@
     pm.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function clickSend() {
-    const btn = selectorManager.getSend();
-    if (!btn) throw new Error('发送按钮未找到');
+  async function clickSend() {
+    const btn = await selectorManager.waitForSend(10000);
     btn.click();
   }
 
@@ -85,7 +84,7 @@
 
         // 输入 + 发送
         this.state = 'RUNNING'; this._emit();
-        try { dispatchInput(item.text); clickSend(); }
+        try { dispatchInput(item.text); await clickSend(); }
         catch (e) {
           console.error('[dwt-batch] send failed:', e);
           continue;

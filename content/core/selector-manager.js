@@ -67,9 +67,26 @@
         if (!b.querySelector('svg')) continue;
         const r = b.getBoundingClientRect();
         if (r.top <= 550) continue;
+        // 优先匹配豆包专属 class
+        if (b.className && b.className.indexOf('bg-g-send-msg-btn') >= 0) return b;
         if (r.right > bestRight) { bestRight = r.right; best = b; }
       }
       return best;
+    },
+
+    // 等待发送按钮出现 (输入框有内容后才渲染, React 状态更新有延迟)
+    waitForSend(timeoutMs) {
+      timeoutMs = timeoutMs || 10000;
+      const start = Date.now();
+      return new Promise((resolve, reject) => {
+        const timer = setInterval(() => {
+          const btn = this.getSend();
+          if (btn) { clearInterval(timer); resolve(btn); }
+          else if (Date.now() - start > timeoutMs) {
+            clearInterval(timer); reject(new Error('waitForSend timeout'));
+          }
+        }, 200);
+      });
     },
   };
 })();
