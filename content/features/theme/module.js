@@ -17,7 +17,7 @@
     [class*="ProseMirror"] { background: #1a1a1a !important; color: #e0e0e0 !important; }
   `;
 
-  function applyTheme(mode) {
+  async function applyTheme(mode) {
     current = mode;
     if (mode === 'dark') {
       if (!styleEl) {
@@ -29,13 +29,13 @@
     } else {
       if (styleEl) { styleEl.remove(); styleEl = null; }
     }
-    try { chrome.storage.local.set({ [KEY]: mode }); } catch (_) {}
+    try { await chrome.storage.local.set({ [KEY]: mode }); } catch (_) {}
   }
 
   async function init() {
     try {
       const r = await chrome.storage.local.get(KEY);
-      applyTheme(r[KEY] || 'light');
+      await applyTheme(r[KEY] || 'light');
     } catch (_) { applyTheme('light'); }
   }
 
