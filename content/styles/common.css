@@ -1,0 +1,7 @@
+/* Prefix: dwt- to avoid clashing with doubao's own class names */
+.dwt-hidden { display: none !important; }
+.dwt-panel {
+  position: fixed; z-index: 999999;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px; line-height: 1.5;
+}
