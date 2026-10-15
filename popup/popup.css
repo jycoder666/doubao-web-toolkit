@@ -1,6 +1,9 @@
 body { width: 280px; margin: 0; padding: 12px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; }
 h1 { margin: 0 0 8px; font-size: 14px; color: #1a1a1a; }
-.section { display: flex; gap: 8px; flex-direction: column; margin-bottom: 10px; }
-button { padding: 6px 10px; border: 1px solid #d0d7de; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; }
+.section { display: flex; gap: 6px; flex-wrap: wrap; flex-direction: column; margin-bottom: 12px; }
+.section-title { font-size: 11px; color: #666; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+button { padding: 6px 10px; border: 1px solid #d0d7de; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; width: 100%; box-sizing: border-box; }
 button:hover { background: #f6f8fa; }
-#status { color: #666; font-size: 12px; min-height: 16px; }
+button.primary { background: #2d72de; color: #fff; border-color: #2d72de; }
+button.primary:hover { background: #1f5ec4; }
+.muted { color: #666; font-size: 11px; min-height: 14px; }
