@@ -1,65 +1,37 @@
-// Entry injector for doubao.com / dola.com
-// Dynamic import — zero build, ES Module.
+// content-loader.js — 入口脚本
+// MV3 content script 不支持 ES Module, 所以 manifest 按依赖顺序列出所有 JS
+// 这里只做: 打印 log + 响应 popup 消息 + 功能开关路由
+(function () {
+  'use strict';
 
-const LOG = '[doubao-web-toolkit]';
+  const LOG = '[doubao-web-toolkit]';
+  console.log(LOG, 'loaded on', location.href);
 
-const FEATURE_MODULES = {
-  'debug-panel':   () => import('./features/debug-panel/module.js'),
-  'batch-input':   () => import('./features/batch-input/module.js'),
-  'export':        () => import('./features/export/module.js'),
-  'navigator':     () => import('./features/navigator/module.js'),
-  'prompt-bar':    () => import('./features/prompt-bar/module.js'),
-  'theme':         () => import('./features/theme/module.js'),
-  'enhance':       () => import('./features/enhance/module.js'),
-  'source-inspector': () => import('./features/source-inspector/module.js'),
-};
+  // 从 storage 读功能开关 (默认都开)
+  chrome.storage.local.get('dwt_features').then((r) => {
+    const enabled = r.dwt_features || { debugPanel: true, batchInput: true };
+    console.log(LOG, 'features:', enabled);
+  }).catch(() => {});
 
-async function loadActiveFeatures() {
-  const { dwt_features } = await chrome.storage.local.get('dwt_features');
-  const enabled = dwt_features || { debugPanel: true };
-
-  // 映射 feature toggle id → module 名
-  const toggleMap = {
-    debugPanel: 'debug-panel',
-    batchInput: 'batch-input',
-    export: 'export',
-    navigator: 'navigator',
-    promptBar: 'prompt-bar',
-    theme: 'theme',
-    enhance: 'enhance',
-    sourceInspector: 'source-inspector',
-  };
-
-  for (const [toggleId, modName] of Object.entries(toggleMap)) {
-    if (enabled[toggleId] && FEATURE_MODULES[modName]) {
-      try {
-        const mod = await FEATURE_MODULES[modName]();
-        mod.default?.init?.();
-        console.log(LOG, 'feature loaded:', modName);
-      } catch (e) {
-        console.warn(LOG, 'feature load failed:', modName, e);
-      }
+  // 响应 popup 的消息
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (!msg) return;
+    if (msg.type === 'TOGGLE_DEBUG_PANEL') {
+      window.dispatchEvent(new CustomEvent('dwt-toggle-debug-panel'));
+      sendResponse({ ok: true });
+      return true;
     }
-  }
-}
-
-// 响应 popup "TOGGLE_DEBUG_PANEL" 消息
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'TOGGLE_DEBUG_PANEL') {
-    window.dispatchEvent(new CustomEvent('dwt-toggle-debug-panel'));
-    sendResponse({ ok: true });
-  }
-  if (msg?.type === 'START_BATCH') {
-    // 批量输入启动逻辑在 batch-input module 里监听此事件
-    window.dispatchEvent(new CustomEvent('dwt-start-batch', { detail: msg.payload }));
-    sendResponse({ ok: true });
-  }
-  if (msg?.type === 'BATCH_RESUME') {
-    window.dispatchEvent(new CustomEvent('dwt-resume-batch'));
-    sendResponse({ ok: true });
-  }
-  return true;
-});
-
-console.log(LOG, 'loaded on', location.href);
-loadActiveFeatures();
+    if (msg.type === 'START_BATCH') {
+      window.dispatchEvent(new CustomEvent('dwt-start-batch', { detail: msg.payload }));
+      sendResponse({ ok: true });
+      return true;
+    }
+    if (msg.type === 'BATCH_RESUME') {
+      // runner 内部在等 chrome.runtime.onMessage 的 BATCH_RESUME
+      // 直接透传
+      sendResponse({ ok: true });
+      return true;
+    }
+    return true;
+  });
+})();
