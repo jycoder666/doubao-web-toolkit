@@ -26,9 +26,18 @@
       sendResponse({ ok: true });
       return true;
     }
+    if (msg.type === 'STOP_BATCH') {
+      window.dispatchEvent(new CustomEvent('dwt-stop-batch'));
+      sendResponse({ ok: true });
+      return true;
+    }
     if (msg.type === 'BATCH_RESUME') {
-      // runner 内部在等 chrome.runtime.onMessage 的 BATCH_RESUME
-      // 直接透传
+      // runner.js 内部直接监听 chrome.runtime.onMessage, 这里只需 sendResponse
+      sendResponse({ ok: true });
+      return true;
+    }
+    if (msg.type === 'EXPORT_CHAT') {
+      window.dispatchEvent(new CustomEvent('dwt-export-chat', { detail: msg.payload }));
       sendResponse({ ok: true });
       return true;
     }
