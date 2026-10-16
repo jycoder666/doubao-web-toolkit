@@ -3,8 +3,13 @@ const FEATURE_KEYS = {
   'feat-source': 'dwt_source_inspector', // 联网来源标注 (默认开)
   'feat-input': 'dwt_enter_swap',        // 输入增强 (默认开)
   'feat-conv': 'dwt_conv_manager',       // 对话管理 (默认关)
+  'feat-readmark': 'dwt_reading_mark',   // 阅读位置标记 (默认开)
+  'feat-digest': 'dwt_chat_digest',      // 对话摘要 (默认关)
   'feat-debug': 'dwt_debug_panel',       // 调试面板 (默认开)
 };
+
+// 默认关闭的功能 (其余默认开启)
+const DEFAULT_OFF = ['dwt_conv_manager', 'dwt_chat_digest'];
 
 async function load() {
   // 批量输入 + 全局设置
@@ -17,9 +22,9 @@ async function load() {
   document.getElementById('min-interval').value = r.dwt_min_interval || 3;
   document.getElementById('reply-timeout').value = r.dwt_reply_timeout || 180;
 
-  // 功能开关: 未设置时用默认值 (source/input/debug 默认开, conv 默认关)
+  // 功能开关: 未设置时用默认值 (DEFAULT_OFF 中的默认关, 其余默认开)
   Object.entries(FEATURE_KEYS).forEach(([id, key]) => {
-    const def = key === 'dwt_conv_manager' ? false : true;
+    const def = !DEFAULT_OFF.includes(key);
     document.getElementById(id).checked = r[key] === undefined ? def : r[key] === true;
   });
 }

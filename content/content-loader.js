@@ -63,6 +63,8 @@
       dwt_source_inspector: () => window.dwt?.sourceInspectorModule?.setEnabled?.(value),
       dwt_enter_swap: () => window.dwt?.inputEnhanceModule?.setSwap?.(value),
       dwt_conv_manager: () => window.dwt?.convManagerModule?.setEnabled?.(value),
+      dwt_reading_mark: () => window.dwt?.readingMarkModule?.setEnabled?.(value),
+      dwt_chat_digest: () => window.dwt?.chatDigestModule?.setEnabled?.(value),
       dwt_debug_panel: () => {
         // 调试面板由 TOGGLE_DEBUG_PANEL 控制, 这里只记录状态
       },

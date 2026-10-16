@@ -127,6 +127,16 @@ document.getElementById('toggle-conv').addEventListener('click', (e) => {
   toggleFeature(e.currentTarget, 'dwt_conv_manager', false);
 });
 
+document.getElementById('toggle-readmark').dataset.label = '阅读标记';
+document.getElementById('toggle-readmark').addEventListener('click', (e) => {
+  toggleFeature(e.currentTarget, 'dwt_reading_mark', true);
+});
+
+document.getElementById('toggle-digest').dataset.label = '对话摘要';
+document.getElementById('toggle-digest').addEventListener('click', (e) => {
+  toggleFeature(e.currentTarget, 'dwt_chat_digest', false);
+});
+
 // 立即扫描来源
 document.getElementById('scan-source').addEventListener('click', async () => {
   const tab = await getActiveDoubaoTab();
@@ -137,11 +147,17 @@ document.getElementById('scan-source').addEventListener('click', async () => {
 
 // 初始化按钮的开关态
 (async function initToolButtons() {
-  const r = await chrome.storage.local.get(['dwt_source_inspector', 'dwt_conv_manager']);
+  const r = await chrome.storage.local.get([
+    'dwt_source_inspector', 'dwt_conv_manager', 'dwt_reading_mark', 'dwt_chat_digest',
+  ]);
   document.getElementById('toggle-source')
     .classList.toggle('on', r.dwt_source_inspector !== false);
   document.getElementById('toggle-conv')
     .classList.toggle('on', r.dwt_conv_manager === true);
+  document.getElementById('toggle-readmark')
+    .classList.toggle('on', r.dwt_reading_mark !== false);
+  document.getElementById('toggle-digest')
+    .classList.toggle('on', r.dwt_chat_digest === true);
 })();
 
 // 监听 content script 反馈
