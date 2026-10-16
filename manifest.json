@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Doubao Web Toolkit",
   "short_name": "doubao-toolkit",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Chrome/Edge extension for doubao.com: 调试面板、批量输入+验证码暂停、对话导出、选择器注册表",
   "icons": {
     "16": "icons/icon16.png",

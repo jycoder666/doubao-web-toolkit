@@ -34,12 +34,24 @@
     if (document.getElementById(STYLE_ID)) return;
     const st = document.createElement('style');
     st.id = STYLE_ID;
+    // 浅色 (默认) + 深色 (body 背景偏暗时自动切换, 见 applyDark())
     st.textContent = `
       #dwt-nav {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background:rgba(255,255,255,0.96);
+        border:1px solid rgba(0,0,0,0.06);
+        box-shadow:0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+        color:#1f2328;
       }
+      #dwt-nav .dwt-nav-header { color:#1f2328; }
+      #dwt-nav .dwt-nav-collapse { color:#8b949e; }
+      #dwt-nav .dwt-nav-collapse:hover { background:#f0f2f5; }
+      #dwt-nav .dwt-nav-search { border:1px solid #d0d7de; color:#1f2328; background:#fff; }
+      #dwt-nav .dwt-nav-search::placeholder { color:#8b949e; }
+      #dwt-nav .dwt-nav-search:focus { border-color:#2d72de; box-shadow:0 0 0 3px rgba(45,114,222,.15); }
+      #dwt-nav .dwt-nav-footer { border-top-color:#f0f2f5; color:#8b949e; }
       #dwt-nav .dwt-nav-rows { overflow-x:hidden; }
-      #dwt-nav .dwt-nav-rows::-webkit-scrollbar { width: 4px; }
+      #dwt-nav .dwt-nav-rows::-webkit-scrollbar { width:4px; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar-thumb { background:#d0d7de; border-radius:2px; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar-track { background:transparent; }
       #dwt-nav .dwt-nav-row {
@@ -47,13 +59,8 @@
         padding:5px 6px; border-radius:6px; cursor:pointer;
         transition: background .12s ease;
       }
-      #dwt-nav .dwt-nav-row:hover {
-        background:#f0f4ff;
-      }
-      #dwt-nav .dwt-nav-row.dwt-nav-current {
-        background:#e8f0ff;
-        color:#2d72de;
-      }
+      #dwt-nav .dwt-nav-row:hover { background:#f0f4ff; }
+      #dwt-nav .dwt-nav-row.dwt-nav-current { background:#e8f0ff; color:#2d72de; }
       #dwt-nav .dwt-nav-num {
         flex-shrink:0; width:20px; height:20px; border-radius:50%;
         background:#f0f2f5; color:#656d76; font-size:10px; font-weight:600;
@@ -66,10 +73,59 @@
         color:#1f2328; font-size:12px; line-height:1.4;
       }
       #dwt-nav .dwt-nav-row.dwt-nav-current .dwt-nav-text { color:#1a56db; font-weight:500; }
+      #dwt-nav .dwt-nav-empty { color:#8b949e; padding:6px; text-align:center; font-size:11px; }
       #dwt-nav.dwt-nav-collapsed .dwt-nav-body,
       #dwt-nav.dwt-nav-collapsed .dwt-nav-footer { display:none !important; }
+
+      /* === 深色模式 (自动检测 body 背景亮度) === */
+      #dwt-nav.dwt-nav-dark {
+        background:rgba(28,29,32,0.92);
+        border:1px solid rgba(255,255,255,0.08);
+        box-shadow:0 8px 28px rgba(0,0,0,0.5);
+        color:#e6e8ea;
+      }
+      #dwt-nav.dwt-nav-dark .dwt-nav-header { color:#e6e8ea; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-collapse { color:#8b949e; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-collapse:hover { background:rgba(255,255,255,0.08); }
+      #dwt-nav.dwt-nav-dark .dwt-nav-search { border:1px solid rgba(255,255,255,0.15); color:#e6e8ea; background:rgba(255,255,255,0.04); }
+      #dwt-nav.dwt-nav-dark .dwt-nav-search::placeholder { color:#8b949e; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-search:focus { border-color:#4d8bf5; box-shadow:0 0 0 3px rgba(77,139,245,.25); }
+      #dwt-nav.dwt-nav-dark .dwt-nav-footer { border-top-color:rgba(255,255,255,0.08); color:#8b949e; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-rows::-webkit-scrollbar-thumb { background:#4b4d52; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-row:hover { background:rgba(255,255,255,0.06); }
+      #dwt-nav.dwt-nav-dark .dwt-nav-row.dwt-nav-current { background:rgba(77,139,245,0.18); color:#4d8bf5; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-num { background:rgba(255,255,255,0.08); color:#9aa0a6; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-row:hover .dwt-nav-num { background:rgba(77,139,245,0.2); color:#4d8bf5; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-text { color:#e6e8ea; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-row.dwt-nav-current .dwt-nav-text { color:#7fb0ff; font-weight:500; }
+      #dwt-nav.dwt-nav-dark .dwt-nav-empty { color:#8b949e; }
     `;
     document.head.appendChild(st);
+  }
+
+  // 检测深色: 读 body computed background-color 的亮度 (相对系统主题更稳,
+  // 因为豆包可能自己切换主题而不响应 prefers-color-scheme)
+  function isDarkNow() {
+    try {
+      const bodyBg = getComputedStyle(document.body).backgroundColor;
+      // rgba(x,y,z,a) 或 rgb(x,y,z)
+      const m = bodyBg?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      if (m) {
+        const [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])];
+        // 亮度感知公式: 0.299R + 0.587G + 0.114B
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        return lum < 100;  // 经验阈值: #222 ≈ 47, #333 ≈ 80, #666 ≈ 140
+      }
+    } catch (e) { /* 忽略 */ }
+    // 兜底: 看系统设置
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  }
+
+  function applyDark() {
+    const panel = document.getElementById(PANEL_ID);
+    if (!panel) return;
+    const dark = isDarkNow();
+    panel.classList.toggle('dwt-nav-dark', dark);
   }
 
   function renderItems() {
@@ -118,7 +174,6 @@
   function mount() {
     const list = collectUserQuestions();
     if (!list.length) {
-      // 没消息时清掉旧面板, 避免残留
       const old = document.getElementById(PANEL_ID);
       if (old) old.remove();
       return;
@@ -130,41 +185,29 @@
 
     const nav = document.createElement('div');
     nav.id = PANEL_ID;
-    // 定位右侧 (豆包左侧有约 280px 固定会话栏), top:84px 避开顶栏
+    // 容器样式全部在 CSS 里 (light 默认 / dwt-nav-dark 深色), 这里只定位
     nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:999998;width:200px;max-height:70vh;'
-      + 'display:flex;flex-direction:column;'
-      + 'background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);'
-      + 'border:1px solid rgba(0,0,0,0.06);border-radius:12px;'
-      + 'box-shadow:0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);'
-      + 'padding:10px;transition:max-height .25s ease, opacity .2s ease;';
+      + 'display:flex;flex-direction:column;border-radius:12px;padding:10px;'
+      + 'transition:max-height .25s ease, opacity .2s ease;';
     if (collapsed) nav.classList.add('dwt-nav-collapsed');
 
     nav.innerHTML =
-      // 头部: 标题 + 折叠按钮
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      + '<div style="font-size:13px;font-weight:600;color:#1f2328;letter-spacing:.2px;">\u{1F4CC} 导航</div>'
-      + '<span id="dwt-nav-collapse" title="折叠/展开" style="cursor:pointer;font-size:14px;color:#8b949e;'
-      + 'padding:2px 6px;border-radius:4px;transition:background .12s;"'
-      + 'onmouseover="this.style.background=\'#f0f2f5\'" onmouseout="this.style.background=\'transparent\'">'
+      + '<div class="dwt-nav-header" style="font-size:13px;font-weight:600;letter-spacing:.2px;">\u{1F4CC} 导航</div>'
+      + '<span id="dwt-nav-collapse" class="dwt-nav-collapse" title="折叠/展开" '
+      + 'style="cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;">'
       + (collapsed ? '\u25B6' : '\u25C0') + '</span>'
       + '</div>'
-      // 搜索框
       + '<div class="dwt-nav-body">'
-      + '<input id="dwt-nav-search" type="text" placeholder="\u{1F50D} 搜索提问…" '
-      + 'style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:6px 10px;border:1px solid #d0d7de;'
-      + 'border-radius:8px;font-size:12px;outline:none;transition:border-color .15s, box-shadow .15s;"'
-      + 'onfocus="this.style.borderColor=\'#2d72de\';this.style.boxShadow=\'0 0 0 3px rgba(45,114,222,.15)\'"'
-      + 'onblur="this.style.borderColor=\'#d0d7de\';this.style.boxShadow=\'none\'">'
-      // 条目列表
+      + '<input id="dwt-nav-search" class="dwt-nav-search" type="text" placeholder="\u{1F50D} 搜索提问…" '
+      + 'style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:6px 10px;border-radius:8px;font-size:12px;outline:none;">'
       + '<div class="dwt-nav-rows" style="overflow-y:auto;flex:1;"></div>'
-      // 底部统计
       + '</div>'
-      + '<div class="dwt-nav-footer" style="padding-top:6px;margin-top:6px;border-top:1px solid #f0f2f5;'
-      + 'font-size:10px;color:#8b949e;text-align:center;"></div>';
+      + '<div class="dwt-nav-footer" style="padding-top:6px;margin-top:6px;font-size:10px;text-align:center;"></div>';
 
     document.body.appendChild(nav);
+    applyDark();
 
-    // 折叠按钮
     const collapse = nav.querySelector('#dwt-nav-collapse');
     collapse.addEventListener('click', () => {
       collapsed = !collapsed;
@@ -172,13 +215,11 @@
       collapse.textContent = collapsed ? '\u25B6' : '\u25C0';
     });
 
-    // 搜索
     const search = nav.querySelector('#dwt-nav-search');
     search.value = keyword;
     search.addEventListener('input', (e) => { keyword = e.target.value; renderItems(); });
     search.addEventListener('keydown', (e) => e.stopPropagation());
 
-    // 点击跳转 + 高亮 1.5s
     nav.addEventListener('click', (e) => {
       const el = e.target.closest('[data-idx]');
       if (!el) return;
@@ -249,8 +290,8 @@
       navList = list;
       const panel = document.getElementById(PANEL_ID);
       if (!panel) mount();
-      else { renderItems(); markCurrent(); }
-    }, 150);  // 150ms 防抖, 避免流式输出时连刷
+      else { renderItems(); markCurrent(); applyDark(); }
+    }, 150);
   }
   // 滚动时更新"当前"高亮, 500ms 防抖
   let markTimer = null;
