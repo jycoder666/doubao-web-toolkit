@@ -15,12 +15,15 @@ async function load() {
   // 批量输入 + 全局设置
   const r = await chrome.storage.local.get([
     'dwt_batch_json', 'dwt_batch_lines', 'dwt_min_interval', 'dwt_reply_timeout',
+    'dwt_dev_hot_reload',
     ...Object.values(FEATURE_KEYS),
   ]);
   document.getElementById('batch-json').value = r.dwt_batch_json || '';
   document.getElementById('batch-lines').value = r.dwt_batch_lines || '';
   document.getElementById('min-interval').value = r.dwt_min_interval || 3;
   document.getElementById('reply-timeout').value = r.dwt_reply_timeout || 180;
+  // 开发热重载: 默认关闭
+  document.getElementById('dev-hot-reload').checked = r.dwt_dev_hot_reload === true;
 
   // 功能开关: 未设置时用默认值 (DEFAULT_OFF 中的默认关, 其余默认开)
   Object.entries(FEATURE_KEYS).forEach(([id, key]) => {
@@ -35,6 +38,7 @@ document.getElementById('save').addEventListener('click', async () => {
     dwt_batch_lines: document.getElementById('batch-lines').value,
     dwt_min_interval: Number(document.getElementById('min-interval').value),
     dwt_reply_timeout: Number(document.getElementById('reply-timeout').value),
+    dwt_dev_hot_reload: document.getElementById('dev-hot-reload').checked,
   };
   Object.entries(FEATURE_KEYS).forEach(([id, key]) => {
     payload[key] = document.getElementById(id).checked;

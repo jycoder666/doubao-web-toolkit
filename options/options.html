@@ -57,6 +57,13 @@
     <div class="row"><label>最小间隔(秒)</label><input type="number" id="min-interval" value="3"></div>
     <div class="row"><label>回复超时(秒)</label><input type="number" id="reply-timeout" value="180"></div>
 
+    <h2>开发</h2>
+    <div class="row">
+      <label>开发热重载<span class="tip" data-tip="仅开发时使用。开启后：① 扩展每 1.5 秒对自身源码文件做一次指纹比对；② 检测到任意源码文件被修改（保存）时，自动刷新所有已打开的豆包标签页，并自动重载扩展本身；③ 无需再手动去 chrome://extensions 点「重新加载」或手动刷新页面。注意：会周期性读取扩展文件，正式使用请保持关闭。">ⓘ</span></label>
+      <input type="checkbox" id="dev-hot-reload">
+      <span class="muted">改动源码后自动重载扩展 + 刷新豆包页面（仅开发，默认关闭）</span>
+    </div>
+
     <button id="save">保存</button>
     <div id="msg"></div>
   </div>

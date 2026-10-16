@@ -1,4 +1,7 @@
 // MV3 Service Worker. Short tasks only.
+// 顶部维护：接入开发热重载模块（零依赖），按 dwt_dev_hot_reload 开关决定是否启用。
+try { importScripts('hot-reload.js'); } catch (e) { console.warn('[dwt] hot-reload 加载失败', e); }
+
 const KEYS = {
   FEATURES: 'dwt_features',
   SELECTORS: 'dwt_selectors',
