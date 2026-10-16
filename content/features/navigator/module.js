@@ -46,12 +46,14 @@
     if (document.getElementById('dwt-nav')) { document.getElementById('dwt-nav').remove(); }
     const nav = document.createElement('div');
     nav.id = 'dwt-nav';
-    nav.style.cssText = 'position:fixed;left:8px;top:50%;transform:translateY(-50%);z-index:999998;width:140px;max-height:60vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:11px;';
+    // 定位在窗口右侧: 豆包左侧有约 280px 固定会话栏, 放左侧会遮挡聊天区, 故移到右侧。
+    // 顶部 84px 起, 避开同侧其他扩展 UI(对话摘要面板 top:72px / 提示词条 bottom:64px)。
+    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:999998;width:150px;max-height:64vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:11px;';
     nav.innerHTML = '<b style="display:block;margin-bottom:6px;font-size:12px;">📍 导航</b>'
       + '<input id="dwt-nav-search" type="text" placeholder="搜索提问…" '
       + 'style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:3px 6px;border:1px solid #d0d7de;'
       + 'border-radius:5px;font-size:11px;outline:none;">'
-      + '<div id="dwt-nav-items" style="overflow-y:auto;max-height:52vh;"></div>';
+      + '<div id="dwt-nav-items" style="overflow-y:auto;max-height:56vh;"></div>';
     document.body.appendChild(nav);
 
     const search = nav.querySelector('#dwt-nav-search');
