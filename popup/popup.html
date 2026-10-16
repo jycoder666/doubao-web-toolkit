@@ -30,11 +30,11 @@
 
     <div class="section">
       <div class="section-title">工具</div>
-      <button id="toggle-source">🔗 来源标注 开/关</button>
-      <button id="toggle-conv">🗂 对话管理 开/关</button>
-      <button id="toggle-readmark">📌 阅读标记 开/关</button>
-      <button id="toggle-digest">🧾 对话摘要 开/关</button>
-      <button id="scan-source">🔍 立即扫描来源</button>
+      <button id="toggle-source" class="tip" data-tip="开启后：在每条 AI 回复下方扫描链接，显示「来源 N」蓝色徽标 + 可信度分级；点击徽标可展开原始链接。关闭后徽标立即移除。">🔗 来源标注 开/关</button>
+      <button id="toggle-conv" class="tip" data-tip="开启后：左侧会话列表每项出现勾选框，顶部出现「删除所选/全选」操作条，可批量删除会话（不可恢复）。关闭后恢复原生列表。">🗂 对话管理 开/关</button>
+      <button id="toggle-readmark" class="tip" data-tip="开启后：自动记录每个会话读到的那一条；重开会话时顶部弹出「📌 上次读到第 N 条」提示条，可一键跳回，约 12 秒后淡出。关闭后停止记录与提示。">📌 阅读标记 开/关</button>
+      <button id="toggle-digest" class="tip" data-tip="开启后：右下角出现「🧾」悬浮按钮，点击在右上角弹出摘要面板，本地生成 Markdown 提纲（轮次/条数/字数 + 每轮要点），支持复制与下载，零网络请求。关闭后按钮与面板移除。">🧾 对话摘要 开/关</button>
+      <button id="scan-source" class="tip" data-tip="立即对当前会话的 AI 回复执行一次来源扫描（不改变开关状态）。">🔍 立即扫描来源</button>
     </div>
 
     <div id="status" class="muted"></div>

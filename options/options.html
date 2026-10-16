@@ -13,12 +13,37 @@
     <p class="muted">功能开关 + 批量输入模板 + 全局设置</p>
 
     <h2>功能开关</h2>
-    <div class="row"><label>联网来源标注</label><input type="checkbox" id="feat-source"><span class="muted">在 AI 回复旁显示「来源 N」徽标 + 可信度分级</span></div>
-    <div class="row"><label>输入增强</label><input type="checkbox" id="feat-input"><span class="muted">Ctrl(⌘)+Enter 发送 / 记忆上次使用的模型</span></div>
-    <div class="row"><label>对话管理</label><input type="checkbox" id="feat-conv"><span class="muted">左侧会话列表批量勾选 + 删除（默认关闭）</span></div>
-    <div class="row"><label>阅读位置标记</label><input type="checkbox" id="feat-readmark"><span class="muted">记住每个会话的阅读位置，重开时提示一键跳回</span></div>
-    <div class="row"><label>对话摘要</label><input type="checkbox" id="feat-digest"><span class="muted">右下角「🧾」生成提纲级摘要，可复制/下载（默认关闭）</span></div>
-    <div class="row"><label>调试面板</label><input type="checkbox" id="feat-debug"><span class="muted">右下角「⚙ DWT」按钮 + 选择器表</span></div>
+    <p class="muted">悬停「ⓘ」可查看每个开关开启后页面会发生哪些变化。</p>
+    <div class="row">
+      <label>联网来源标注<span class="tip" data-tip="开启后：① 在每条 AI 回复下方自动扫描正文中的链接；② 为链接编号并显示「来源 1/2/3」蓝色徽标；③ 按域名给出可信度分级（官方/媒体/其他）；④ 徽标点击可展开原始链接。关闭后所有徽标与扫描结果立即移除。">ⓘ</span></label>
+      <input type="checkbox" id="feat-source">
+      <span class="muted">在 AI 回复旁显示「来源 N」徽标 + 可信度分级</span>
+    </div>
+    <div class="row">
+      <label>输入增强<span class="tip" data-tip="开启后：① 输入框改为 Ctrl(⌘)+Enter 发送、单独 Enter 换行（默认相反）；② 自动记忆你上次选择的模型，刷新或新开会话时自动切回该模型。关闭后恢复豆包原生按键行为，不再记忆模型。">ⓘ</span></label>
+      <input type="checkbox" id="feat-input">
+      <span class="muted">Ctrl(⌘)+Enter 发送 / 记忆上次使用的模型</span>
+    </div>
+    <div class="row">
+      <label>对话管理<span class="tip" data-tip="开启后：① 左侧会话列表每项出现勾选框，可多选；② 顶部出现「删除所选」「全选」操作条；③ 支持批量删除会话（删除不可恢复，请谨慎操作）。关闭后勾选框与操作条消失，会话列表恢复原生状态。">ⓘ</span></label>
+      <input type="checkbox" id="feat-conv">
+      <span class="muted">左侧会话列表批量勾选 + 删除（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>阅读位置标记<span class="tip" data-tip="开启后：① 自动记录你在每个会话读到的那一条（消息序号 + 文本指纹双定位，抗页面重渲染）；② 重新打开该会话时，顶部弹出「📌 上次读到第 N 条」提示条，含「跳转 / 关闭」按钮，约 12 秒后自动淡出；③ 若你已在锚点附近则不打扰。关闭后停止记录与提示，已有记录保留在本机。">ⓘ</span></label>
+      <input type="checkbox" id="feat-readmark">
+      <span class="muted">记住每个会话的阅读位置，重开时提示一键跳回</span>
+    </div>
+    <div class="row">
+      <label>对话摘要<span class="tip" data-tip="开启后：① 右下角出现「🧾」悬浮按钮（位于阅读标记按钮上方）；② 点击后在右上角弹出摘要面板，本地抽取当前会话生成 Markdown 提纲（轮次 / 条数 / 字数统计 + 每轮问答要点）；③ 支持「复制」与「下载 .md」，全程零网络请求。关闭后按钮与面板立即移除。">ⓘ</span></label>
+      <input type="checkbox" id="feat-digest">
+      <span class="muted">右下角「🧾」生成提纲级摘要，可复制/下载（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>调试面板<span class="tip" data-tip="开启后：① 页面右下角出现「⚙ DWT」悬浮按钮；② 点击展开调试面板，可查看选择器注册表（各 DOM 选择器的当前命中情况）、功能加载状态与运行日志。主要用于开发排查，普通使用可关闭以减少页面元素。">ⓘ</span></label>
+      <input type="checkbox" id="feat-debug">
+      <span class="muted">右下角「⚙ DWT」按钮 + 选择器表</span>
+    </div>
 
     <h2>批量输入模板</h2>
     <div class="tabs">

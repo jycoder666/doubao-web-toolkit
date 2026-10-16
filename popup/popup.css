@@ -7,5 +7,12 @@ button:hover { background: #f6f8fa; }
 button.primary { background: #2d72de; color: #fff; border-color: #2d72de; }
 button.primary:hover { background: #1f5ec4; }
 button.on { background: #e6f4ea; color: #1a7f37; border-color: #a8d5b5; font-weight: 600; }
-button.on::after { content: " ✓"; }
+/* 开启态勾选标记用 ::before, 避免与 .tip 的 ::after 浮层冲突 */
+button.on::before { content: "✓ "; }
 .muted { color: #666; font-size: 11px; min-height: 14px; }
+
+/* 工具按钮提示: 悬停时在按钮下方浮层说明开启后的具体变化 */
+.section { position: relative; }
+button.tip { position: relative; }
+button.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); width: 100%; box-sizing: border-box; padding: 8px 10px; background: #24292f; color: #fff; font-size: 11px; line-height: 1.6; font-weight: 400; text-align: left; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.28); white-space: normal; opacity: 0; visibility: hidden; transition: opacity .15s ease; z-index: 30; pointer-events: none; }
+button.tip:hover::after { opacity: 1; visibility: visible; }
