@@ -77,20 +77,29 @@
       #dwt-nav.dwt-nav-collapsed .dwt-nav-body,
       #dwt-nav.dwt-nav-collapsed .dwt-nav-footer { display:none !important; }
 
-      /* === 深色模式 (自动检测 body 背景亮度) === */
+      /* === 深色模式: !important 覆盖 inline style === */
       #dwt-nav.dwt-nav-dark {
-        background:rgba(28,29,32,0.92);
-        border:1px solid rgba(255,255,255,0.08);
-        box-shadow:0 8px 28px rgba(0,0,0,0.5);
-        color:#e6e8ea;
+        background:rgba(28,29,32,0.92) !important;
+        border:1px solid rgba(255,255,255,0.1) !important;
+        box-shadow:0 8px 28px rgba(0,0,0,0.6) !important;
+        color:#e6e8ea !important;
       }
-      #dwt-nav.dwt-nav-dark .dwt-nav-header { color:#e6e8ea; }
-      #dwt-nav.dwt-nav-dark .dwt-nav-collapse { color:#8b949e; }
-      #dwt-nav.dwt-nav-dark .dwt-nav-collapse:hover { background:rgba(255,255,255,0.08); }
-      #dwt-nav.dwt-nav-dark .dwt-nav-search { border:1px solid rgba(255,255,255,0.15); color:#e6e8ea; background:rgba(255,255,255,0.04); }
-      #dwt-nav.dwt-nav-dark .dwt-nav-search::placeholder { color:#8b949e; }
-      #dwt-nav.dwt-nav-dark .dwt-nav-search:focus { border-color:#4d8bf5; box-shadow:0 0 0 3px rgba(77,139,245,.25); }
-      #dwt-nav.dwt-nav-dark .dwt-nav-footer { border-top-color:rgba(255,255,255,0.08); color:#8b949e; }
+      #dwt-nav.dwt-nav-dark > div:first-child > div:first-child { color:#e6e8ea !important; } /* 标题 */
+      #dwt-nav.dwt-nav-dark > div:first-child > span { color:#8b949e !important; } /* 折叠按钮 */
+      #dwt-nav.dwt-nav-dark #dwt-nav-search {
+        border:1px solid rgba(255,255,255,0.18) !important;
+        color:#e6e8ea !important;
+        background:rgba(255,255,255,0.05) !important;
+      }
+      #dwt-nav.dwt-nav-dark #dwt-nav-search::placeholder { color:#8b949e !important; }
+      #dwt-nav.dwt-nav-dark #dwt-nav-search:focus {
+        border-color:#4d8bf5 !important;
+        box-shadow:0 0 0 3px rgba(77,139,245,.25) !important;
+      }
+      #dwt-nav.dwt-nav-dark .dwt-nav-footer {
+        border-top:1px solid rgba(255,255,255,0.1) !important;
+        color:#8b949e !important;
+      }
       #dwt-nav.dwt-nav-dark .dwt-nav-rows::-webkit-scrollbar-thumb { background:#4b4d52; }
       #dwt-nav.dwt-nav-dark .dwt-nav-row:hover { background:rgba(255,255,255,0.06); }
       #dwt-nav.dwt-nav-dark .dwt-nav-row.dwt-nav-current { background:rgba(77,139,245,0.18); color:#4d8bf5; }
@@ -132,10 +141,12 @@
   }
 
   function applyDark() {
-    const panel = document.getElementById(PANEL_ID);
-    if (!panel) return;
-    const dark = isDarkNow();
-    panel.classList.toggle('dwt-nav-dark', dark);
+    try {
+      const panel = document.getElementById(PANEL_ID);
+      if (!panel) return;
+      const dark = isDarkNow();
+      panel.classList.toggle('dwt-nav-dark', dark);
+    } catch (e) { /* 深色检测失败不影响面板显示 */ }
   }
 
   function renderItems() {
@@ -195,25 +206,35 @@
 
     const nav = document.createElement('div');
     nav.id = PANEL_ID;
-    // 容器样式全部在 CSS 里 (light 默认 / dwt-nav-dark 深色), 这里只定位
+    // 双保险: inline style 保证面板可见 (即使 injectStyles 因故没跑),
+    // CSS class (.dwt-nav-dark) 负责深色切换
     nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:999998;width:200px;max-height:70vh;'
-      + 'display:flex;flex-direction:column;border-radius:12px;padding:10px;'
-      + 'transition:max-height .25s ease, opacity .2s ease;';
+      + 'display:flex;flex-direction:column;'
+      + 'background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);'
+      + 'border:1px solid rgba(0,0,0,0.06);border-radius:12px;'
+      + 'box-shadow:0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);'
+      + 'padding:10px;transition:max-height .25s ease, opacity .2s ease;';
     if (collapsed) nav.classList.add('dwt-nav-collapsed');
 
     nav.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      + '<div class="dwt-nav-header" style="font-size:13px;font-weight:600;letter-spacing:.2px;">\u{1F4CC} 导航</div>'
-      + '<span id="dwt-nav-collapse" class="dwt-nav-collapse" title="折叠/展开" '
-      + 'style="cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;">'
+      + '<div style="font-size:13px;font-weight:600;color:#1f2328;letter-spacing:.2px;">\u{1F4CC} 导航</div>'
+      + '<span id="dwt-nav-collapse" style="cursor:pointer;font-size:14px;color:#8b949e;'
+      + 'padding:2px 6px;border-radius:4px;" '
+      + 'onmouseover="this.style.background=\'#f0f2f5\'" onmouseout="this.style.background=\'transparent\'">'
       + (collapsed ? '\u25B6' : '\u25C0') + '</span>'
       + '</div>'
       + '<div class="dwt-nav-body">'
-      + '<input id="dwt-nav-search" class="dwt-nav-search" type="text" placeholder="\u{1F50D} 搜索提问…" '
-      + 'style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:6px 10px;border-radius:8px;font-size:12px;outline:none;">'
-      + '<div class="dwt-nav-rows" style="overflow-y:auto;flex:1;"></div>'
+      + '<input id="dwt-nav-search" type="text" placeholder="\u{1F50D} 搜索提问…" '
+      + 'style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:6px 10px;border:1px solid #d0d7de;'
+      + 'border-radius:8px;font-size:12px;color:#1f2328;background:#fff;outline:none;'
+      + 'transition:border-color .15s, box-shadow .15s;"'
+      + 'onfocus="this.style.borderColor=\'#2d72de\';this.style.boxShadow=\'0 0 0 3px rgba(45,114,222,.15)\'"'
+      + 'onblur="this.style.borderColor=\'#d0d7de\';this.style.boxShadow=\'none\'">'
+      + '<div class="dwt-nav-rows" style="overflow-y:auto;overflow-x:hidden;flex:1;"></div>'
       + '</div>'
-      + '<div class="dwt-nav-footer" style="padding-top:6px;margin-top:6px;font-size:10px;text-align:center;"></div>';
+      + '<div class="dwt-nav-footer" style="padding-top:6px;margin-top:6px;border-top:1px solid #f0f2f5;'
+      + 'font-size:10px;color:#8b949e;text-align:center;"></div>';
 
     document.body.appendChild(nav);
     applyDark();
