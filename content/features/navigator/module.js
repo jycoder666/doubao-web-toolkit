@@ -103,21 +103,31 @@
     document.head.appendChild(st);
   }
 
-  // 检测深色: 读 body computed background-color 的亮度 (相对系统主题更稳,
-  // 因为豆包可能自己切换主题而不响应 prefers-color-scheme)
+  // 检测深色: 读页面真实容器的背景亮度.
+  // 不依赖 prefers-color-scheme —— 豆包可能自己切换主题而不响应系统设置.
   function isDarkNow() {
     try {
-      const bodyBg = getComputedStyle(document.body).backgroundColor;
-      // rgba(x,y,z,a) 或 rgb(x,y,z)
-      const m = bodyBg?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+      // 优先: body 直接是纯色背景 (豆包浅色模式常见)
+      let bg = getComputedStyle(document.body).backgroundColor;
+      // 兜底: body 透明时, 从消息区容器往上找第一个非透明背景
+      if (!bg || bg === 'transparent' || bg.startsWith('rgba(0, 0, 0, 0)')) {
+        const candidates = document.querySelector('[class*="scroller"]')
+                       || document.querySelector('[class*="message-list"]')
+                       || document.querySelector('main');
+        let el = candidates;
+        while (el && el !== document.documentElement) {
+          const c = getComputedStyle(el).backgroundColor;
+          if (c && !c.startsWith('rgba(0, 0, 0, 0)') && c !== 'transparent') { bg = c; break; }
+          el = el.parentElement;
+        }
+      }
+      const m = bg?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
       if (m) {
         const [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])];
-        // 亮度感知公式: 0.299R + 0.587G + 0.114B
         const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        return lum < 100;  // 经验阈值: #222 ≈ 47, #333 ≈ 80, #666 ≈ 140
+        return lum < 100;  // 经验阈值
       }
     } catch (e) { /* 忽略 */ }
-    // 兜底: 看系统设置
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   }
 
