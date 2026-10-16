@@ -13,14 +13,66 @@
     const pm = selectorManager.getInput();
     if (!pm) throw new Error('ProseMirror 输入框未找到');
     pm.focus();
+    // 空输入时豆包隐藏 send-btn-wrapper（只留语音）。
+    // execCommand(insertText) 能改 DOM 文本但不会唤醒发送钮；必须 innerHTML + input。
     pm.innerHTML = '<p dir="auto">' + text + '</p>';
     pm.dispatchEvent(new InputEvent('input', { data: text, inputType: 'insertText', bubbles: true }));
     pm.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  function getRealSendButton() {
+    const wrapped = document.querySelector('.send-btn-wrapper button');
+    if (wrapped && !wrapped.disabled) return wrapped;
+    const byCls = document.querySelector('button[class*="bg-g-send-msg-btn"]');
+    if (byCls && !byCls.disabled) return byCls;
+    return null;
+  }
+
+  async function waitForRealSend(timeoutMs) {
+    timeoutMs = timeoutMs || 10000;
+    const start = Date.now();
+    return new Promise((resolve, reject) => {
+      const timer = setInterval(() => {
+        const btn = getRealSendButton();
+        if (btn) { clearInterval(timer); resolve(btn); }
+        else if (Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          reject(new Error('发送按钮未出现 (send-btn-wrapper)'));
+        }
+      }, 100);
+    });
+  }
+
   async function clickSend() {
-    const btn = await selectorManager.waitForSend(10000);
+    const btn = await waitForRealSend(10000);
     btn.click();
+  }
+
+  function countUserBubbles() {
+    return document.querySelectorAll('[class*="bg-g-send-msg-bubble-bg"]').length;
+  }
+
+  async function waitSendAck(beforeCount, sentText, timeoutMs) {
+    timeoutMs = timeoutMs || 8000;
+    const start = Date.now();
+    const needle = (sentText || '').trim().slice(0, 40);
+    return new Promise((resolve, reject) => {
+      const timer = setInterval(() => {
+        const bubbles = document.querySelectorAll('[class*="bg-g-send-msg-bubble-bg"]');
+        const grew = bubbles.length > beforeCount;
+        let matched = false;
+        if (needle) {
+          for (let i = bubbles.length - 1; i >= Math.max(0, bubbles.length - 3); i--) {
+            if ((bubbles[i].innerText || '').indexOf(needle) >= 0) { matched = true; break; }
+          }
+        }
+        if (grew || matched) { clearInterval(timer); resolve(true); }
+        else if (Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          reject(new Error('send not acknowledged (no new user bubble)'));
+        }
+      }, 200);
+    });
   }
 
   class BatchRunner {
@@ -93,17 +145,24 @@
 
         // 输入 + 发送
         this.state = 'RUNNING'; this._emit();
-        try { dispatchInput(item.text); await clickSend(); }
-        catch (e) {
+        const bubblesBefore = countUserBubbles();
+        try {
+          dispatchInput(item.text);
+          await clickSend();
+          await waitSendAck(bubblesBefore, item.text, 8000);
+        } catch (e) {
           console.error('[dwt-batch] send failed:', e);
+          this.state = 'PAUSED_BY_TIMEOUT'; this._emit();
+          await this.waitForResume();
           continue;
         }
 
-        // 等回复
+        // 等回复（先等开始生成，再等结束）
         this.state = 'WAITING_REPLY'; this._emit();
         try {
           await replyState.whenDone({ timeout: (item.timeout || this.replyTimeout) * 1000 });
         } catch (e) {
+          console.error('[dwt-batch] reply wait failed:', e);
           this.state = 'PAUSED_BY_TIMEOUT'; this._emit();
           await this.waitForResume();
         }

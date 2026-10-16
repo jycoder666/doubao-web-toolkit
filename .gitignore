@@ -4,3 +4,4 @@ node_modules/
 Thumbs.db
 .debug-profile/
 .git-commit-msg.tmp
+dev/.preview-storage.json

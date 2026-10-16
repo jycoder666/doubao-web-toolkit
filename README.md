@@ -30,7 +30,7 @@ Chrome/Edge Manifest V3 浏览器扩展，专门服务 doubao.com / dola.com 网
 2. Chrome 打开 `chrome://extensions` → 右上角开发者模式 → **加载已解压的扩展程序** → 选中本项目目录
 3. 打开 `https://www.doubao.com/chat`
 4. 页面上会出现：
-   - 右下角「⚙ DWT」蓝色按钮 → 点开调试面板
+   - 右下角「⚙ 调试」蓝色按钮 → 点开调试面板
    - 右下角「提示词」快捷条
    - 右侧「📍 导航」条
    - 左下角「⬇」悬浮按钮
@@ -116,6 +116,15 @@ FNV-1a 指纹轮询比对；因 MV3 Service Worker 约 30s 空闲即被终止，
 - MV3 原生支持更稳定
 - 权限声明透明（manifest.json）
 - 不依赖宿主扩展的权限系统
+
+## Cursor 内置浏览器（无法装扩展）
+
+内置浏览器不能加载 MV3 扩展，开发时靠本地静态服 + 页面注入：
+
+1. 仓库根目录启动：`python dev/serve.py`（`http://127.0.0.1:5179`，已开 CORS / Private Network）
+2. 在豆包页注入：`http://127.0.0.1:5179/dev/live-boot.js`（CDP `Runtime.evaluate` 插 `<script>`，或 Cursor `preload-browser.js` 若可用）
+3. 预览弹窗与豆包页靠 `/dev/bridge/bus` + `/dev/bridge/storage` 互通（`chrome-mock.js`）；选项页保存的批量模板与 popup「开始批量发送」可驱动已注入的豆包页。BroadcastChannel / 第三方 iframe 的 storage 事件会被顶级站点隔离，故不用。
+4. **刷新会清空页面 JS**：`#dwt-nav` 等会消失；preload 未自动注入时须重新执行第 2 步。扩展安装模式不受此限制。
 
 ---
 

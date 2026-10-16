@@ -56,17 +56,28 @@ body {
   position: fixed;
   left: 12px;
   bottom: 12px;
-  width: 360px;
-  max-height: 46vh;
+  width: 220px;
+  max-height: 42vh;
   overflow: auto;
   background: #24292f;
   color: #f0f6fc;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   z-index: 20;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
 }
-.overlay h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+.overlay h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  padding: 2px 0 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.overlay.dragging h2 { cursor: grabbing; }
+.overlay.dragging { opacity: 0.92; }
 .overlay pre {
   margin: 0;
   white-space: pre-wrap;

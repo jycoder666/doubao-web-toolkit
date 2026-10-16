@@ -221,6 +221,46 @@
     writeQuery();
     if (!overlay.hidden) measure();
   });
+
+  // 标题栏拖拽，避免挡住选项页表单
+  (function enableOverlayDrag() {
+    const handle = document.getElementById('overlay-drag') || overlay.querySelector('h2');
+    if (!handle) return;
+    let dragging = false;
+    let ox = 0;
+    let oy = 0;
+    handle.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      dragging = true;
+      overlay.classList.add('dragging');
+      const rect = overlay.getBoundingClientRect();
+      ox = ev.clientX - rect.left;
+      oy = ev.clientY - rect.top;
+      overlay.style.left = rect.left + 'px';
+      overlay.style.top = rect.top + 'px';
+      overlay.style.bottom = 'auto';
+      overlay.style.right = 'auto';
+      try { handle.setPointerCapture(ev.pointerId); } catch (_) { /* ignore */ }
+      ev.preventDefault();
+    });
+    handle.addEventListener('pointermove', (ev) => {
+      if (!dragging) return;
+      const maxX = Math.max(0, window.innerWidth - overlay.offsetWidth);
+      const maxY = Math.max(0, window.innerHeight - overlay.offsetHeight);
+      const x = Math.min(maxX, Math.max(0, ev.clientX - ox));
+      const y = Math.min(maxY, Math.max(0, ev.clientY - oy));
+      overlay.style.left = x + 'px';
+      overlay.style.top = y + 'px';
+    });
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      overlay.classList.remove('dragging');
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  })();
+
   copyBtn.addEventListener('click', async () => {
     const pack = [
       '## UI 反馈',

@@ -5,11 +5,19 @@ const FEATURE_KEYS = {
   'feat-conv': 'dwt_conv_manager',       // 对话管理 (默认关)
   'feat-readmark': 'dwt_reading_mark',   // 阅读位置标记 (默认开)
   'feat-digest': 'dwt_chat_digest',      // 对话摘要 (默认关)
+  'feat-selection': 'dwt_selection_tools', // 划词语料/高亮/LaTeX (默认开)
+  'feat-rec': 'dwt_rec_blocker',         // 首页推荐屏蔽 (默认开)
+  'feat-vibe': 'dwt_vibe',               // 背景氛围 (默认关)
+  'feat-float': 'dwt_float_panel',       // 悬浮便签 (默认关)
+  'feat-comfort': 'dwt_page_comfort',    // 宽屏/长回复折叠 (默认关)
+  'feat-spark': 'dwt_keyword_spark',     // 视觉关键词 (默认关)
+  'feat-context': 'dwt_context_lines',   // 英语拆行解释 (默认关)
+  'feat-arxiv': 'dwt_arxiv_prompt',      // arXiv 解读提示 (默认关)
   'feat-debug': 'dwt_debug_panel',       // 调试面板 (默认开)
 };
 
 // 默认关闭的功能 (其余默认开启)
-const DEFAULT_OFF = ['dwt_conv_manager', 'dwt_chat_digest'];
+const DEFAULT_OFF = ['dwt_conv_manager', 'dwt_chat_digest', 'dwt_vibe', 'dwt_float_panel', 'dwt_page_comfort', 'dwt_keyword_spark', 'dwt_context_lines', 'dwt_arxiv_prompt'];
 
 async function load() {
   // 批量输入 + 全局设置

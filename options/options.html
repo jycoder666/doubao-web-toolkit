@@ -42,9 +42,49 @@
       <span class="muted">右下角「🧾」生成提纲级摘要，可复制/下载（默认关闭）</span>
     </div>
     <div class="row">
-      <label>调试面板<span class="tip" data-tip="开启后：① 页面右下角出现「⚙ DWT」悬浮按钮；② 点击展开调试面板，可查看选择器注册表（各 DOM 选择器的当前命中情况）、功能加载状态与运行日志。主要用于开发排查，普通使用可关闭以减少页面元素。">ⓘ</span></label>
+      <label>划词语料 / 高亮<span class="tip" data-tip="开启后：① 在对话区选中文字出现「收藏 / 高亮 / 复制」；② 右下角「📌」打开语料板，点击条目插入输入框（用 [] 包裹）；③ 公式悬停可复制 LaTeX。对应总表 #101 / #84。关闭后浮层与语料板隐藏。">ⓘ</span></label>
+      <input type="checkbox" id="feat-selection">
+      <span class="muted">选中文字收藏到语料板 + 高亮 + LaTeX 复制</span>
+    </div>
+    <div class="row">
+      <label>首页推荐屏蔽<span class="tip" data-tip="开启后：用 CSS 隐藏豆包首页建议/推荐区块（#experiment-guidance-suggestions 等）。对应总表 #58。关闭后恢复显示。">ⓘ</span></label>
+      <input type="checkbox" id="feat-rec">
+      <span class="muted">隐藏首页推荐/建议卡片（默认开启）</span>
+    </div>
+    <div class="row">
+      <label>背景氛围<span class="tip" data-tip="开启后：左下角出现色板切换条，可在海洋蓝/紫罗兰/森林绿/暖金棕/石墨灰五套渐变氛围间切换；仅 CSS 层，不改对话数据。对应总表 #63。默认关闭。">ⓘ</span></label>
+      <input type="checkbox" id="feat-vibe">
+      <span class="muted">五套背景氛围预设（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>悬浮便签<span class="tip" data-tip="开启后：出现可拖拽/缩放的本地便签窗；Ctrl+Shift+H 显隐；内容与位置存本机。对应总表 #86（页内精简，非全站 iframe）。默认关闭。">ⓘ</span></label>
+      <input type="checkbox" id="feat-float">
+      <span class="muted">可拖拽本地便签 · Ctrl+Shift+H（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>宽屏与折叠<span class="tip" data-tip="开启后：右侧出现「宽屏」开关，拉满对话区宽度；超过约 220 字的回复默认折叠，可点「展开长回复」。对应总表 #87。默认关闭。">ⓘ</span></label>
+      <input type="checkbox" id="feat-comfort">
+      <span class="muted">宽屏布局 + 长回复折叠（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>视觉关键词<span class="tip" data-tip="开启后：左下角面板把中文主题拼成 Pinterest / Behance / 花瓣检索词，点击复制。不访问外站。对应总表 #56。默认关闭。">ⓘ</span></label>
+      <input type="checkbox" id="feat-spark">
+      <span class="muted">本地生成视觉检索词（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>英语拆行<span class="tip" data-tip="开启后：选中一段英文（至少 4 个词）弹出拆行卡片，可把「逐句解释」提示插入输入框。不录音。对应总表 #96。默认关闭。">ⓘ</span></label>
+      <input type="checkbox" id="feat-context">
+      <span class="muted">选中英语后拆行并插入解释提示（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>论文解读提示<span class="tip" data-tip="开启后：右侧出现 arXiv 输入条，识别编号或链接后插入中文解读提纲。不抓取论文。对应总表 #105。默认关闭。">ⓘ</span></label>
+      <input type="checkbox" id="feat-arxiv">
+      <span class="muted">arXiv 编号写入解读提示（默认关闭）</span>
+    </div>
+    <div class="row">
+      <label>调试面板<span class="tip" data-tip="开启后：① 页面右下角出现「⚙ 调试」悬浮按钮；② 点击展开调试面板，可查看/编辑 DOM 选择器、看回复与验证码实时状态、用元素选择模式拾取选择器。主要用于开发排查，普通使用可关闭。">ⓘ</span></label>
       <input type="checkbox" id="feat-debug">
-      <span class="muted">右下角「⚙ DWT」按钮 + 选择器表</span>
+      <span class="muted">右下角「⚙ 调试」按钮 + 选择器表</span>
     </div>
 
     <h2>批量输入模板</h2>
@@ -61,7 +101,7 @@
 
     <h2>开发</h2>
     <div class="row">
-      <label>开发热重载<span class="tip" data-tip="仅开发时使用。开启后：① 扩展每 1.5 秒对自身源码文件做一次指纹比对；② 检测到任意源码文件被修改（保存）时，自动刷新所有已打开的豆包标签页，并自动重载扩展本身；③ 无需再手动去 chrome://extensions 点「重新加载」或手动刷新页面。注意：会周期性读取扩展文件，正式使用请保持关闭。">ⓘ</span></label>
+      <label>开发热重载<span class="tip tip-down" data-tip="仅开发时使用。开启后：① 扩展每 1.5 秒对自身源码文件做一次指纹比对；② 检测到任意源码文件被修改（保存）时，自动刷新所有已打开的豆包标签页，并自动重载扩展本身；③ 无需再手动去 chrome://extensions 点「重新加载」或手动刷新页面。注意：会周期性读取扩展文件，正式使用请保持关闭。">ⓘ</span></label>
       <input type="checkbox" id="dev-hot-reload">
       <span class="muted">改动源码后自动重载扩展 + 刷新豆包页面（仅开发，默认关闭）</span>
     </div>

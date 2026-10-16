@@ -76,18 +76,18 @@
 
     // 获取发送按钮 (用特征匹配, 更稳)
     getSend() {
-      const btns = document.querySelectorAll('button');
-      let best = null, bestRight = -1;
-      for (const b of btns) {
-        if (b.disabled) continue;
-        if (!b.querySelector('svg')) continue;
-        const r = b.getBoundingClientRect();
-        if (r.top <= 550) continue;
-        // 优先匹配豆包专属 class
-        if (b.className && b.className.indexOf('bg-g-send-msg-btn') >= 0) return b;
-        if (r.right > bestRight) { bestRight = r.right; best = b; }
+      // 只认真实发送钮。空输入时豆包会隐藏它；切勿回落到同排工具 chip。
+      const wrapped = document.querySelector('.send-btn-wrapper button');
+      if (wrapped && !wrapped.disabled) {
+        const wr = wrapped.getBoundingClientRect();
+        if (wr.width > 0 && wr.height > 0) return wrapped;
       }
-      return best;
+      const byCls = document.querySelector('button[class*="bg-g-send-msg-btn"]');
+      if (byCls && !byCls.disabled) {
+        const r = byCls.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) return byCls;
+      }
+      return null;
     },
 
     // 等待发送按钮出现 (输入框有内容后才渲染, React 状态更新有延迟)

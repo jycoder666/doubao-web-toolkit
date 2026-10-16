@@ -147,6 +147,54 @@ document.getElementById('toggle-digest').addEventListener('click', (e) => {
   toggleFeature(btn, 'dwt_chat_digest', false);
 });
 
+document.getElementById('toggle-selection').dataset.label = '语料/高亮';
+document.getElementById('toggle-selection').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_selection_tools', true);
+});
+
+document.getElementById('toggle-rec').dataset.label = '推荐屏蔽';
+document.getElementById('toggle-rec').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_rec_blocker', true);
+});
+
+document.getElementById('toggle-vibe').dataset.label = '背景氛围';
+document.getElementById('toggle-vibe').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_vibe', false);
+});
+
+document.getElementById('toggle-float').dataset.label = '悬浮便签';
+document.getElementById('toggle-float').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_float_panel', false);
+});
+
+document.getElementById('toggle-comfort').dataset.label = '宽屏折叠';
+document.getElementById('toggle-comfort').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_page_comfort', false);
+});
+
+document.getElementById('toggle-spark').dataset.label = '视觉关键词';
+document.getElementById('toggle-spark').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_keyword_spark', false);
+});
+
+document.getElementById('toggle-context').dataset.label = '英语拆行';
+document.getElementById('toggle-context').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_context_lines', false);
+});
+
+document.getElementById('toggle-arxiv').dataset.label = '论文提示';
+document.getElementById('toggle-arxiv').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_arxiv_prompt', false);
+});
+
 // 立即扫描来源
 document.getElementById('scan-source').addEventListener('click', async () => {
   const tab = await getActiveDoubaoTab();
@@ -159,6 +207,8 @@ document.getElementById('scan-source').addEventListener('click', async () => {
 (async function initToolButtons() {
   const r = await chrome.storage.local.get([
     'dwt_source_inspector', 'dwt_conv_manager', 'dwt_reading_mark', 'dwt_chat_digest',
+    'dwt_selection_tools', 'dwt_rec_blocker', 'dwt_vibe', 'dwt_float_panel',
+    'dwt_page_comfort', 'dwt_keyword_spark', 'dwt_context_lines', 'dwt_arxiv_prompt',
   ]);
   document.getElementById('toggle-source')
     .classList.toggle('on', r.dwt_source_inspector !== false);
@@ -168,12 +218,29 @@ document.getElementById('scan-source').addEventListener('click', async () => {
     .classList.toggle('on', r.dwt_reading_mark !== false);
   document.getElementById('toggle-digest')
     .classList.toggle('on', r.dwt_chat_digest === true);
+  document.getElementById('toggle-selection')
+    .classList.toggle('on', r.dwt_selection_tools !== false);
+  document.getElementById('toggle-rec')
+    .classList.toggle('on', r.dwt_rec_blocker !== false);
+  document.getElementById('toggle-vibe')
+    .classList.toggle('on', r.dwt_vibe === true);
+  document.getElementById('toggle-float')
+    .classList.toggle('on', r.dwt_float_panel === true);
+  document.getElementById('toggle-comfort')
+    .classList.toggle('on', r.dwt_page_comfort === true);
+  document.getElementById('toggle-spark')
+    .classList.toggle('on', r.dwt_keyword_spark === true);
+  document.getElementById('toggle-context')
+    .classList.toggle('on', r.dwt_context_lines === true);
+  document.getElementById('toggle-arxiv')
+    .classList.toggle('on', r.dwt_arxiv_prompt === true);
 })();
 
 // 监听 content script 反馈
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'BATCH_EVENT') {
-    setBatchStatus(msg.state + ': ' + (msg.index + 1) + '/' + msg.total);
+    const n = msg.state === 'DONE' ? msg.total : (msg.index + 1);
+    setBatchStatus(msg.state + ': ' + n + '/' + msg.total);
   }
   if (msg?.type === 'BATCH_CAPTCHA_DETECTED') {
     setBatchStatus('⚠ 检测到验证码, 已暂停, 处理完点"继续下一条"');

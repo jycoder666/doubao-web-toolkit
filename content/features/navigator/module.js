@@ -8,15 +8,30 @@
   'use strict';
 
   const dwt = window.dwt = window.dwt || {};
+  // 防重复注入：live-boot / CDP 再挂一次时旧 interval + 新 loadAll 会叠成死滚
+  if (dwt.navigatorModule) {
+    console.log('[cs][doubao-web-toolkit] navigator already mounted, skip re-init');
+    return;
+  }
+
   const SEL_USER_BUBBLE = '[class*="bg-g-send-msg-bubble-bg"]';
   const PANEL_ID = 'dwt-nav';
   const STYLE_ID = 'dwt-nav-style';
+  const SCAN_BUDGET_MS = 18000; // 整次全量扫描硬超时，避免宿主页一直被程序滚动
+  const SWEEP_MAX_STEPS = 80;
+  const PULL_MAX = 6;
 
   let navList = [];
   let keyword = '';
   let collapsed = false;
+  // true = 尽量一屏铺开全部条目（仍受视口高度限制）；false = 紧凑高度
+  let fitAll = true;
 
   let scanning = false;
+  let scanGen = 0;           // 切换会话时自增，作废进行中的扫描
+  let activeChatId = '';     // 当前 URL 里的 /chat/<id>
+  let lastFullScanChatId = '';
+  let lastFullScanAt = 0;
 
   function bubbleText(node) {
     return (node.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 80);
@@ -91,7 +106,16 @@
         border:1px solid rgba(0,0,0,0.06);
         box-shadow:0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
         color:#1f2328;
+        overflow:hidden;
+        box-sizing:border-box;
       }
+      #dwt-nav .dwt-nav-body {
+        display:flex; flex-direction:column; flex:1 1 auto;
+        min-height:0; overflow:hidden;
+      }
+      #dwt-nav .dwt-nav-footer { flex-shrink:0; cursor:pointer; user-select:none; }
+      #dwt-nav .dwt-nav-footer:hover { color:#2d72de; }
+      #dwt-nav.dwt-nav-fitall .dwt-nav-rows { overflow-y:auto; }
       #dwt-nav .dwt-nav-header { color:#1f2328; }
       #dwt-nav .dwt-nav-collapse { color:#8b949e; }
       #dwt-nav .dwt-nav-collapse:hover { background:#f0f2f5; }
@@ -99,13 +123,15 @@
       #dwt-nav .dwt-nav-search::placeholder { color:#8b949e; }
       #dwt-nav .dwt-nav-search:focus { border-color:#2d72de; box-shadow:0 0 0 3px rgba(45,114,222,.15); }
       #dwt-nav .dwt-nav-footer { border-top-color:#f0f2f5; color:#8b949e; }
-      #dwt-nav .dwt-nav-rows { overflow-x:hidden; }
+      #dwt-nav .dwt-nav-rows {
+        overflow-x:hidden; overflow-y:auto; flex:1 1 auto; min-height:0;
+      }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar { width:4px; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar-thumb { background:#d0d7de; border-radius:2px; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar-track { background:transparent; }
       #dwt-nav .dwt-nav-row {
-        display:flex; align-items:center; gap:6px;
-        padding:5px 6px; border-radius:6px; cursor:pointer;
+        display:flex; align-items:center; gap:5px;
+        padding:3px 5px; border-radius:5px; cursor:pointer;
         transition: background .12s ease;
       }
       #dwt-nav .dwt-nav-row:hover { background:#f0f4ff; }
@@ -215,7 +241,43 @@
     });
     box.innerHTML = rows.length ? rows.join('') : '<div style="color:#8b949e;padding:6px;text-align:center;font-size:11px;">无匹配</div>';
     const footer = document.querySelector('#' + PANEL_ID + ' .dwt-nav-footer');
-    if (footer) footer.textContent = scanning ? '正在读取全部提问…' : ('共 ' + navList.length + ' 条');
+    if (footer) {
+      if (scanning) footer.textContent = '正在读取全部提问…';
+      else {
+        footer.textContent = fitAll
+          ? ('共 ' + navList.length + ' 条 · 点击收起高度')
+          : ('共 ' + navList.length + ' 条 · 点击铺开全部');
+      }
+    }
+    applyFitAll();
+  }
+
+  // 铺开模式：面板随内容长高（上限为视口），能放下就整表可见不用滚；放不下才在列表内滚
+  function applyFitAll() {
+    const panel = document.getElementById(PANEL_ID);
+    if (!panel || collapsed) return;
+    const body = panel.querySelector('.dwt-nav-body');
+    const rows = panel.querySelector('.dwt-nav-rows');
+    panel.classList.toggle('dwt-nav-fitall', fitAll);
+    // 最高不超过视口 60%，超出在列表内滚动
+    panel.style.maxHeight = '60vh';
+    if (fitAll) {
+      panel.style.height = 'auto';
+      if (body) body.style.flex = '0 1 auto';
+      if (rows) {
+        rows.style.flex = '0 1 auto';
+        rows.style.maxHeight = 'none';
+        rows.style.overflowY = 'auto';
+      }
+    } else {
+      panel.style.height = '';
+      if (body) body.style.flex = '1 1 auto';
+      if (rows) {
+        rows.style.flex = '1 1 auto';
+        rows.style.maxHeight = '';
+        rows.style.overflowY = 'auto';
+      }
+    }
   }
 
   // 高亮当前视口内最靠上的用户提问 (让用户知道"当前读到哪一条")
@@ -268,10 +330,14 @@
   }
 
   // 虚拟列表不会在改 scrollTop 的同一帧换气泡，等到文本变了或超时再采样。
-  function waitForWindow(previousKey, timeout) {
+  function waitForWindow(previousKey, timeout, shouldAbort) {
     return new Promise((resolve) => {
       const start = Date.now();
       const tick = () => {
+        if (shouldAbort && shouldAbort()) {
+          resolve(visibleTexts().join('\n'));
+          return;
+        }
         const now = visibleTexts().join('\n');
         const elapsed = Date.now() - start;
         if ((previousKey && now !== previousKey && elapsed >= 40) || elapsed >= timeout) resolve(now);
@@ -313,17 +379,36 @@
   }
 
   // 从顶扫到底。步长小于一屏，保证相邻窗口有重叠，漏掉的气泡不会被接丢。
-  async function sweep(sc) {
+  // shouldAbort / deadline：会话切换或超时立刻停滚，避免虚拟列表 height 一直涨时空转。
+  async function sweep(sc, shouldAbort, deadline) {
     let texts = [];
     let y = 0;
     let guard = 0;
     let prev = '';
-    while (guard++ < 160) {
+    let lastLen = 0;
+    let stagnant = 0;
+    let lastH = -1;
+    let heightStuck = 0;
+    while (guard++ < SWEEP_MAX_STEPS) {
+      if (shouldAbort && shouldAbort()) break;
+      if (deadline && Date.now() >= deadline) break;
+      if (!sc.isConnected) break;
       nudge(sc, y);
-      prev = await waitForWindow(prev, y === 0 ? 700 : 280);
+      prev = await waitForWindow(prev, y === 0 ? 500 : 220, shouldAbort);
       texts = mergeTexts(texts, visibleTexts());
+      if (texts.length > lastLen) {
+        stagnant = 0;
+        lastLen = texts.length;
+      } else {
+        stagnant++;
+      }
       const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+      if (sc.scrollHeight <= lastH + 2) heightStuck++;
+      else heightStuck = 0;
+      lastH = sc.scrollHeight;
+      // 已到底，或连续多步既无新文案也无高度增长 → 停止本趟
       if (y >= max - 2) break;
+      if (stagnant >= 4 && heightStuck >= 3) break;
       y = Math.min(max, y + stepSize(sc));
     }
     return texts;
@@ -348,40 +433,148 @@
   }
 
   async function pullOlder(sc) {
-    const before = sc.scrollHeight;
+    if (!sc || !sc.isConnected) return false;
+    const beforeH = sc.scrollHeight;
+    const beforeKey = visibleTexts().join('\n');
     nudge(sc, 0);
     requestOlder(sc);
-    await sleep(1000);
-    return sc.scrollHeight > before + 80;
+    await sleep(700);
+    if (!sc.isConnected) return false;
+    const grewH = sc.scrollHeight > beforeH + 80;
+    const grewT = visibleTexts().join('\n') !== beforeKey;
+    return grewH || grewT;
+  }
+
+  function getChatId() {
+    const m = String(location.pathname || '').match(/\/chat\/(\d+)/);
+    return m ? m[1] : '';
+  }
+
+  function applyScanResult(texts) {
+    // 扫描失败/中断时至少展示当前视口已有气泡，避免导航永久空白
+    let merged = texts && texts.length ? texts.slice() : [];
+    merged = mergeTexts(merged, visibleTexts());
+    navList = merged.map((text) => ({ text }));
+    if (navList.length && !document.getElementById(PANEL_ID)) mount();
+    else { renderItems(); markCurrent(); }
   }
 
   async function loadAll() {
     if (scanning) return;
+    const gen = ++scanGen;
+    const chatAtStart = getChatId();
+    activeChatId = chatAtStart || activeChatId;
+    const deadline = Date.now() + SCAN_BUDGET_MS;
+    const aborted = () => gen !== scanGen || getChatId() !== chatAtStart || Date.now() >= deadline;
+
+    // 会话切换后 scroller 可能已换节点，清掉选择器缓存再取
+    try { dwt.selectorManager?.invalidate?.(); } catch (e) { /* 无 selectorManager 时忽略 */ }
     const sc = getScroller();
+    const visibleNow = visibleTexts();
+
+    // 无可滚区域：直接用当前视口，不必程序滚动
     if (!sc || sc.scrollHeight <= sc.clientHeight + 40) {
-      navList = visibleTexts().map((text) => ({ text }));
-      if (navList.length && !document.getElementById(PANEL_ID)) mount();
-      else { renderItems(); markCurrent(); }
+      if (gen !== scanGen) return;
+      applyScanResult(visibleNow);
+      lastFullScanChatId = chatAtStart;
+      lastFullScanAt = Date.now();
       return;
     }
+
+    // 短路径：视口已有条目，且列表高度几乎等于视口（已全部在屏）→ 不扫
+    if (visibleNow.length && sc.scrollHeight <= sc.clientHeight + 80) {
+      if (gen !== scanGen) return;
+      applyScanResult(visibleNow);
+      lastFullScanChatId = chatAtStart;
+      lastFullScanAt = Date.now();
+      return;
+    }
+
     scanning = true;
     renderItems();
     const saved = sc.scrollTop;
-    let texts = [];
+    let texts = visibleNow.slice();
     try {
+      const pass0 = await sweep(sc, aborted, deadline);
+      if (pass0.length >= texts.length) texts = pass0;
+      else texts = mergeTexts(texts, pass0);
+
       let pulls = 0;
-      do {
-        const pass = await sweep(sc);
-        if (pass.length >= texts.length) texts = pass;
+      let stagnantPulls = 0;
+      while (pulls < PULL_MAX && !aborted()) {
+        const beforeLen = texts.length;
+        const pulled = await pullOlder(sc);
+        if (!pulled || aborted()) break;
         pulls++;
-      } while (pulls < 8 && await pullOlder(sc));
+        const pass = await sweep(sc, aborted, deadline);
+        if (pass.length > texts.length) {
+          texts = pass;
+          stagnantPulls = 0;
+        } else {
+          texts = mergeTexts(texts, pass);
+          if (texts.length <= beforeLen) {
+            stagnantPulls++;
+            if (stagnantPulls >= 2) break; // 高度抖了但提问没增多
+          } else {
+            stagnantPulls = 0;
+          }
+        }
+      }
     } finally {
-      nudge(sc, saved);
-      navList = texts.map((text) => ({ text }));
-      scanning = false;
+      // 仅本代扫描收尾；被 chat switch 作废时不要把空结果写回
+      if (gen === scanGen) {
+        try { if (sc && sc.isConnected) nudge(sc, saved); } catch (e) { /* scroller 可能已随会话销毁 */ }
+        scanning = false;
+        applyScanResult(texts);
+        lastFullScanChatId = chatAtStart;
+        lastFullScanAt = Date.now();
+      } else {
+        // 被作废时也确保不卡在 scanning（onChatSwitch 已清，这里双保险）
+        scanning = false;
+      }
     }
-    if (navList.length && !document.getElementById(PANEL_ID)) mount();
-    else { renderItems(); markCurrent(); }
+  }
+
+  // 豆包 SPA：点左侧其他会话只改 URL/DOM，不整页刷新。必须重扫导航。
+  function onChatSwitch(nextId) {
+    if (nextId && nextId === activeChatId) return;
+    activeChatId = nextId || '';
+    scanGen++;
+    scanning = false;
+    keyword = '';
+    navList = [];
+    const panel = document.getElementById(PANEL_ID);
+    if (panel) {
+      const search = panel.querySelector('#dwt-nav-search');
+      if (search) search.value = '';
+      renderItems();
+    }
+    // 等新会话气泡挂上再全量扫描
+    setTimeout(() => {
+      if (getChatId() !== activeChatId) return;
+      loadAll();
+    }, 450);
+  }
+
+  function watchRouteChange() {
+    activeChatId = getChatId();
+    let lastHref = location.href;
+    const check = () => {
+      if (location.href === lastHref) return;
+      lastHref = location.href;
+      onChatSwitch(getChatId());
+    };
+    setInterval(check, 500);
+    window.addEventListener('popstate', check);
+    const wrap = (fn) => function () {
+      const ret = fn.apply(this, arguments);
+      setTimeout(check, 0);
+      return ret;
+    };
+    try {
+      history.pushState = wrap(history.pushState.bind(history));
+      history.replaceState = wrap(history.replaceState.bind(history));
+    } catch (e) { /* 部分环境不可改写 history */ }
   }
 
   function mount() {
@@ -399,42 +592,54 @@
     nav.id = PANEL_ID;
     // 双保险: inline style 保证面板可见 (即使 injectStyles 因故没跑),
     // CSS class (.dwt-nav-dark) 负责深色切换
-    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:999998;width:200px;max-height:70vh;'
-      + 'display:flex;flex-direction:column;'
+    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:999998;width:200px;'
+      + 'max-height:60vh;'
+      + 'display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;'
       + 'background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);'
       + 'border:1px solid rgba(0,0,0,0.06);border-radius:12px;'
       + 'box-shadow:0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);'
-      + 'padding:10px;transition:max-height .25s ease, opacity .2s ease;';
+      + 'padding:8px;transition:max-height .25s ease, opacity .2s ease;';
     if (collapsed) nav.classList.add('dwt-nav-collapsed');
+    if (fitAll) nav.classList.add('dwt-nav-fitall');
 
     nav.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-shrink:0;">'
       + '<div style="font-size:13px;font-weight:600;color:#1f2328;letter-spacing:.2px;">\u{1F4CC} 导航</div>'
       + '<span id="dwt-nav-collapse" style="cursor:pointer;font-size:14px;color:#8b949e;'
       + 'padding:2px 6px;border-radius:4px;" '
       + 'onmouseover="this.style.background=\'#f0f2f5\'" onmouseout="this.style.background=\'transparent\'">'
       + (collapsed ? '\u25B6' : '\u25C0') + '</span>'
       + '</div>'
-      + '<div class="dwt-nav-body">'
+      + '<div class="dwt-nav-body" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden;">'
       + '<input id="dwt-nav-search" type="text" placeholder="\u{1F50D} 搜索提问…" '
       + 'style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:6px 10px;border:1px solid #d0d7de;'
-      + 'border-radius:8px;font-size:12px;color:#1f2328;background:#fff;outline:none;'
+      + 'border-radius:8px;font-size:12px;color:#1f2328;background:#fff;outline:none;flex-shrink:0;'
       + 'transition:border-color .15s, box-shadow .15s;"'
       + 'onfocus="this.style.borderColor=\'#2d72de\';this.style.boxShadow=\'0 0 0 3px rgba(45,114,222,.15)\'"'
       + 'onblur="this.style.borderColor=\'#d0d7de\';this.style.boxShadow=\'none\'">'
-      + '<div class="dwt-nav-rows" style="overflow-y:auto;overflow-x:hidden;flex:1;"></div>'
+      + '<div class="dwt-nav-rows" style="overflow-y:auto;overflow-x:hidden;flex:1 1 auto;min-height:0;"></div>'
       + '</div>'
-      + '<div class="dwt-nav-footer" style="padding-top:6px;margin-top:6px;border-top:1px solid #f0f2f5;'
-      + 'font-size:10px;color:#8b949e;text-align:center;"></div>';
+      + '<div class="dwt-nav-footer" title="点击切换：铺开全部 / 收起高度" style="padding-top:6px;margin-top:6px;border-top:1px solid #f0f2f5;'
+      + 'font-size:10px;color:#8b949e;text-align:center;flex-shrink:0;cursor:pointer;"></div>';
 
     document.body.appendChild(nav);
     applyDark();
+    applyFitAll();
 
     const collapse = nav.querySelector('#dwt-nav-collapse');
     collapse.addEventListener('click', () => {
       collapsed = !collapsed;
       nav.classList.toggle('dwt-nav-collapsed', collapsed);
       collapse.textContent = collapsed ? '\u25B6' : '\u25C0';
+      if (!collapsed) applyFitAll();
+    });
+
+    const footerEl = nav.querySelector('.dwt-nav-footer');
+    footerEl.addEventListener('click', () => {
+      if (scanning) return;
+      fitAll = !fitAll;
+      applyFitAll();
+      renderItems();
     });
 
     const search = nav.querySelector('#dwt-nav-search');
@@ -455,7 +660,7 @@
   }
 
   dwt.navigatorModule = {
-    mount, collectUserQuestions,
+    mount, collectUserQuestions, loadAll,
     setKeyword(k) { keyword = k || ''; renderItems(); },
     markCurrent,
   };
@@ -464,10 +669,13 @@
   let liveObserver = null;
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { mount(); startLiveWatch(); loadAll(); });
+    document.addEventListener('DOMContentLoaded', () => {
+      mount(); startLiveWatch(); watchRouteChange(); loadAll();
+    });
   } else {
     mount();
     startLiveWatch();
+    watchRouteChange();
     loadAll();
   }
 
@@ -500,9 +708,28 @@
     if (scanning) return;
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
+      // URL 已切会话但 interval 尚未跑到时，先按新 id 触发切换
+      const id = getChatId();
+      if (id && activeChatId && id !== activeChatId) {
+        onChatSwitch(id);
+        return;
+      }
       const visible = visibleTexts();
       if (!visible.length) return;
-      const merged = mergeTexts(navList.map((item) => item.text), visible);
+      const oldTexts = navList.map((item) => item.text);
+      // 与旧列表完全无交集 → 多半已换会话，禁止 merge 把两场对话拼在一起
+      const overlap = visible.filter((t) => oldTexts.indexOf(t) >= 0).length;
+      if (oldTexts.length && overlap === 0) {
+        navList = visible.map((text) => ({ text }));
+        const panel = document.getElementById(PANEL_ID);
+        if (!panel) mount();
+        else { renderItems(); markCurrent(); applyDark(); }
+        // 无交集时先展示视口；本会话刚扫过则不再连环 loadAll（扫滚会抖 DOM）
+        const cool = Date.now() - lastFullScanAt < 8000 && lastFullScanChatId === id;
+        if (!scanning && !cool) loadAll();
+        return;
+      }
+      const merged = mergeTexts(oldTexts, visible);
       const changed = merged.length !== navList.length
         || merged.some((text, i) => navList[i]?.text !== text);
       if (!changed) { markCurrent(); return; }

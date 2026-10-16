@@ -5,6 +5,10 @@
   'use strict';
 
   const LOG = '[cs][doubao-web-toolkit]';
+  // 热重载防叠：卸掉旧 listener 再挂新的
+  if (window.__dwtContentLoaderHandler) {
+    try { chrome.runtime.onMessage.removeListener(window.__dwtContentLoaderHandler); } catch (_) {}
+  }
   console.log(LOG, 'loaded on', location.href);
 
   // 从 storage 读功能开关 (默认都开)
@@ -14,7 +18,7 @@
   }).catch(() => {});
 
   // 响应 popup 的消息
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  function onRuntimeMessage(msg, _sender, sendResponse) {
     if (!msg) return;
     if (msg.type === 'TOGGLE_DEBUG_PANEL') {
       window.dispatchEvent(new CustomEvent('dwt-toggle-debug-panel'));
@@ -22,12 +26,21 @@
       return true;
     }
     if (msg.type === 'START_BATCH') {
-      window.dispatchEvent(new CustomEvent('dwt-start-batch', { detail: msg.payload }));
+      // 优先走可热替换的 handler，避免重复注入后旧 CustomEvent listener 叠跑
+      if (window.__dwtBatchHandlers && typeof window.__dwtBatchHandlers.start === 'function') {
+        window.__dwtBatchHandlers.start({ detail: msg.payload });
+      } else {
+        window.dispatchEvent(new CustomEvent('dwt-start-batch', { detail: msg.payload }));
+      }
       sendResponse({ ok: true });
       return true;
     }
     if (msg.type === 'STOP_BATCH') {
-      window.dispatchEvent(new CustomEvent('dwt-stop-batch'));
+      if (window.__dwtBatchHandlers && typeof window.__dwtBatchHandlers.stop === 'function') {
+        window.__dwtBatchHandlers.stop();
+      } else {
+        window.dispatchEvent(new CustomEvent('dwt-stop-batch'));
+      }
       sendResponse({ ok: true });
       return true;
     }
@@ -55,7 +68,9 @@
       return true;
     }
     return true;
-  });
+  }
+  window.__dwtContentLoaderHandler = onRuntimeMessage;
+  chrome.runtime.onMessage.addListener(onRuntimeMessage);
 
   // 根据 storage key 分发到对应模块
   function applyFeatureToggle(key, value) {
@@ -65,6 +80,14 @@
       dwt_conv_manager: () => window.dwt?.convManagerModule?.setEnabled?.(value),
       dwt_reading_mark: () => window.dwt?.readingMarkModule?.setEnabled?.(value),
       dwt_chat_digest: () => window.dwt?.chatDigestModule?.setEnabled?.(value),
+      dwt_selection_tools: () => window.dwt?.selectionToolsModule?.setEnabled?.(value),
+      dwt_rec_blocker: () => window.dwt?.recBlockerModule?.setEnabled?.(value),
+      dwt_vibe: () => window.dwt?.vibeModule?.setEnabled?.(value),
+      dwt_float_panel: () => window.dwt?.floatPanelModule?.setEnabled?.(value),
+      dwt_page_comfort: () => window.dwt?.pageComfortModule?.setEnabled?.(value),
+      dwt_keyword_spark: () => window.dwt?.keywordSparkModule?.setEnabled?.(value),
+      dwt_context_lines: () => window.dwt?.contextLinesModule?.setEnabled?.(value),
+      dwt_arxiv_prompt: () => window.dwt?.arxivPromptModule?.setEnabled?.(value),
       dwt_debug_panel: () => {
         // 调试面板由 TOGGLE_DEBUG_PANEL 控制, 这里只记录状态
       },

@@ -20,11 +20,23 @@
     async whenDone(opts) {
       opts = opts || {};
       const timeout = opts.timeout ?? 180000;
-      const start = Date.now();
+      // 必须先等到「开始生成」, 否则发送失败时 !isGenerating 会立刻 resolve, 状态机空转
+      const startTimeout = opts.startTimeout ?? 15000;
+      const t0 = Date.now();
+      await new Promise((resolve, reject) => {
+        const timer = setInterval(() => {
+          if (this.isGenerating()) { clearInterval(timer); resolve(); }
+          else if (Date.now() - t0 > startTimeout) {
+            clearInterval(timer);
+            reject(new Error('reply did not start within ' + startTimeout + 'ms'));
+          }
+        }, 200);
+      });
+      const genStart = Date.now();
       return new Promise((resolve, reject) => {
         const timer = setInterval(() => {
           if (!this.isGenerating()) { clearInterval(timer); resolve(); }
-          else if (Date.now() - start > timeout) {
+          else if (Date.now() - genStart > timeout) {
             clearInterval(timer); reject(new Error('reply timeout after ' + timeout + 'ms'));
           }
         }, 500);

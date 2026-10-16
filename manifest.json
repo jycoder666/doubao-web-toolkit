@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Doubao Web Toolkit",
   "short_name": "doubao-toolkit",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Chrome/Edge extension for doubao.com: 调试面板、批量输入+验证码暂停、对话导出、选择器注册表",
   "icons": {
     "16": "icons/icon16.png",
@@ -52,6 +52,14 @@
         "content/features/conversation-manager/module.js",
         "content/features/reading-mark/module.js",
         "content/features/chat-digest/module.js",
+        "content/features/selection-tools/module.js",
+        "content/features/rec-blocker/module.js",
+        "content/features/vibe/module.js",
+        "content/features/float-panel/module.js",
+        "content/features/page-comfort/module.js",
+        "content/features/keyword-spark/module.js",
+        "content/features/context-lines/module.js",
+        "content/features/arxiv-prompt/module.js",
         "content/features/batch-input/module.js",
         "content/content-loader.js"
       ]
