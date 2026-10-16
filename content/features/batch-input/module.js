@@ -12,7 +12,7 @@
     runner = new window.BatchRunner(items, opts);
     runner.onEvent((ev) => {
       try { chrome.runtime.sendMessage({ type: 'BATCH_EVENT', ...ev }); } catch (_) {}
-      console.log('[dwt-batch]', ev.state, ev.index + '/' + ev.total);
+      console.log('[cs][dwt-batch]', ev.state, ev.index + '/' + ev.total);
     });
     await runner.run();
     runner = null;
@@ -21,9 +21,9 @@
   window.addEventListener('dwt-stop-batch', () => {
     if (runner) {
       try { runner.stop(); } catch (_) {}
-      console.log('[dwt-batch] stopped by user');
+      console.log('[cs][dwt-batch] stopped by user');
     }
   });
 
-  console.log('[doubao-web-toolkit] batch-input module ready');
+  console.log('[cs][doubao-web-toolkit] batch-input module ready');
 })();

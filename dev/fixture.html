@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>DWT 本地靶页</title>
+  <link rel="stylesheet" href="/dev/tokens.css">
+  <link rel="stylesheet" href="/dev/preview-theme.css">
+  <link rel="stylesheet" href="/content/styles/common.css">
+  <style>
+    body { margin: 0; font-family: var(--ext-font-family); font-size: var(--ext-font); color: #1a1a1a; background: #f6f8fa; }
+    .host { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .side { background: #fff; border-right: 1px solid #d0d7de; padding: 12px; }
+    .side h2 { margin: 0 0 8px; font-size: 13px; }
+    .conv { padding: 8px; border-radius: 6px; background: #f6f8fa; margin-bottom: 6px; font-size: 12px; }
+    .chat { padding: 16px 16px 120px; }
+    .banner { margin-bottom: 12px; min-height: 18px; font-size: 12px; color: #57606a; }
+    .user { margin: 10px 0 10px auto; max-width: 70%; background: #e8f1ff; border-radius: 10px; padding: 8px 12px; }
+    .ai { margin: 10px 0; max-width: 80%; background: #fff; border: 1px solid #d0d7de; border-radius: 10px; padding: 8px 12px; }
+    .composer { position: sticky; bottom: 12px; }
+    .ProseMirror { min-height: 44px; background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 8px 10px; }
+  </style>
+</head>
+<body>
+  <div class="host">
+    <aside class="side">
+      <h2>会话</h2>
+      <div class="conversation-list">
+        <div class="conv">国际新闻搜索</div>
+        <div class="conv">周报草稿</div>
+      </div>
+    </aside>
+    <main class="chat">
+      <div id="dwt-fixture-banner" class="banner">本地靶页：注入的是仓库里的 content scripts，不是第二套 UI。</div>
+      <div class="v_list_scroller" style="max-height: 520px; overflow: auto;">
+        <div class="bg-g-send-msg-bubble-bg user">帮我汇总今天的国际新闻，并给出来源。</div>
+        <div class="conversation-message-content-padding-right ai">
+          今天有三条值得看的消息。参考
+          <a href="https://news.un.org/zh/story/2026/10/example">联合国新闻</a>
+          与
+          <a href="https://link.wtturl.cn/?target=https%3A%2F%2Fapnews.cn%2Fexample">美联社转载</a>。
+        </div>
+        <div class="bg-g-send-msg-bubble-bg user">把上面的内容收成 100 字摘要。</div>
+      </div>
+      <div class="composer">
+        <div class="ProseMirror" contenteditable="true">在这里输入，用来看快捷条是否写进输入框。</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/dev/chrome-mock.js"></script>
+  <script src="/content/core/selector-manager.js"></script>
+  <script src="/content/core/dom-observer.js"></script>
+  <script src="/content/core/reply-state.js"></script>
+  <script src="/content/core/captcha-detector.js"></script>
+  <script src="/content/features/batch-input/runner.js"></script>
+  <script src="/content/features/debug-panel/module.js"></script>
+  <script src="/content/features/export/module.js"></script>
+  <script src="/content/features/theme/module.js"></script>
+  <script src="/content/features/prompt-bar/module.js"></script>
+  <script src="/content/features/navigator/module.js"></script>
+  <script src="/content/features/enhance/module.js"></script>
+  <script src="/content/features/source-inspector/module.js"></script>
+  <script src="/content/features/input-enhance/module.js"></script>
+  <script src="/content/features/conversation-manager/module.js"></script>
+  <script src="/content/features/reading-mark/module.js"></script>
+  <script src="/content/features/chat-digest/module.js"></script>
+  <script src="/content/features/batch-input/module.js"></script>
+  <script src="/content/content-loader.js"></script>
+</body>
+</html>

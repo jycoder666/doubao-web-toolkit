@@ -1,0 +1,51 @@
+/* 仅预览页通过 html 类名开启。扩展真实弹窗不会带这些类，因此不影响已安装扩展。 */
+
+html.dwt-theme-dark body {
+  background: #0d1117;
+  color: #e6edf3;
+}
+html.dwt-theme-dark h1,
+html.dwt-theme-dark h2,
+html.dwt-theme-dark .section-title,
+html.dwt-theme-dark label {
+  color: #e6edf3;
+}
+html.dwt-theme-dark .muted,
+html.dwt-theme-dark .row .muted {
+  color: #8b949e;
+}
+html.dwt-theme-dark button,
+html.dwt-theme-dark textarea,
+html.dwt-theme-dark input,
+html.dwt-theme-dark select {
+  background: #21262d;
+  color: #e6edf3;
+  border-color: #30363d;
+}
+html.dwt-theme-dark button.primary {
+  background: #2d72de;
+  color: #fff;
+  border-color: #2d72de;
+}
+html.dwt-theme-dark button.on {
+  background: #1a3a28;
+  color: #56d364;
+  border-color: #238636;
+}
+
+html.dwt-host-dirty body {
+  font-family: "Comic Sans MS", "Comic Sans", cursive !important;
+  font-size: 22px !important;
+  color: #9a3412 !important;
+  letter-spacing: 0.4px !important;
+  line-height: 1.1 !important;
+}
+
+html.dwt-outline .wrap,
+html.dwt-outline #dwt-debug-panel,
+html.dwt-outline #dwt-panel-toggle,
+html.dwt-outline #dwt-prompt-bar,
+html.dwt-outline #dwt-nav {
+  outline: 1px dashed #2d72de;
+  outline-offset: 2px;
+}

@@ -1,25 +1,30 @@
 // export/module.js — 对话导出: Markdown 单会话 + JSON 全量
 // 传统脚本: IIFE + window.dwt
+// 顶部维护:
+//   - 原实现用 [class*="message-list"] 限定搜索范围, 但豆包页面上此 class 不存在,
+//     导致 collectMessages 始终返回空数组, 导出"未找到对话内容"。
+//   - 修复: 通过 dwt.selectorManager.getMessageList() 取真实容器 (优先内部滚动容器
+//     div.v_list_scroller-*, 无则 document.body)。
 (function () {
   'use strict';
 
   const dwt = window.dwt = window.dwt || {};
 
-  // 选择器识别
   const SEL_USER_BUBBLE = '[class*="bg-g-send-msg-bubble-bg"]';
   const SEL_AI_CONTENT = '[class*="conversation-message-content-padding-right"]';
-  const SEL_IGNORE = '[class*="message-action-bar"], [class*="suggest-message-list"]';
+
+  // 取消息列表根容器 (优先真实滚动容器, 无则 document.body)
+  function getMsgList() {
+    const sm = dwt.selectorManager;
+    if (sm && sm.getMessageList) return sm.getMessageList();
+    return document.body;
+  }
 
   function collectMessages() {
-    // 豆包对话 DOM 遍历: 先找所有顶层消息容器, 判断用户还是 AI
     const results = [];
     const visited = new Set();
+    const list = getMsgList();
 
-    // 策略: 找对话列表容器, 遍历其直接子元素
-    const list = document.querySelector('[class*="message-list"]');
-    if (!list) return results;
-
-    // 收集可能的消息内容元素
     const userBubbles = list.querySelectorAll(SEL_USER_BUBBLE);
     userBubbles.forEach((b) => {
       const t = (b.innerText || '').trim();
@@ -31,9 +36,7 @@
 
     const aiContents = list.querySelectorAll(SEL_AI_CONTENT);
     aiContents.forEach((c) => {
-      // 跳过嵌套在用户气泡里的
       if (c.closest(SEL_USER_BUBBLE)) return;
-      // 跳过操作栏
       if (c.querySelector('[class*="message-action-bar"]')) return;
       const t = (c.innerText || '').trim();
       if (t && !visited.has(c)) {
@@ -42,11 +45,7 @@
       }
     });
 
-    // 按 DOM 位置排序
-    results.sort((a, b) => {
-      return a.node.getBoundingClientRect().top - b.node.getBoundingClientRect().top;
-    });
-
+    results.sort((a, b) => a.node.getBoundingClientRect().top - b.node.getBoundingClientRect().top);
     return results;
   }
 
@@ -99,24 +98,13 @@
       if (!msgs.length) { alert('未找到对话内容'); return; }
       download('doubao-chat-' + Date.now() + '.json', toJSON(msgs), 'application/json');
     },
-    showDialog() {
-      const msgs = collectMessages();
-      const md = toMarkdown(msgs);
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;';
-      wrap.innerHTML = '<div style="background:#fff;border-radius:8px;padding:16px;width:640px;max-height:80vh;overflow:auto;font-family:monospace;font-size:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b>对话预览 (' + msgs.length + ' 条)</b><button onclick="this.closest(\'div\').parentElement.remove()">关闭</button></div><pre style="white-space:pre-wrap;">' + md.replace(/</g,'&lt;') + '</pre><div style="margin-top:8px;"><button id="dwt-export-md" style="margin-right:8px;padding:4px 12px;">导出 Markdown</button><button id="dwt-export-json" style="padding:4px 12px;">导出 JSON</button></div></div>';
-      document.body.appendChild(wrap);
-      wrap.querySelector('#dwt-export-md').onclick = () => { dwt.exportModule.exportMarkdown(); wrap.remove(); };
-      wrap.querySelector('#dwt-export-json').onclick = () => { dwt.exportModule.exportJSON(); wrap.remove(); };
-    },
   };
 
-  // 响应 popup/debug-panel 指令
   window.addEventListener('dwt-export-chat', (e) => {
     const fmt = e.detail?.format || 'md';
     if (fmt === 'json') dwt.exportModule.exportJSON();
     else dwt.exportModule.exportMarkdown();
   });
 
-  console.log('[doubao-web-toolkit] export module ready');
+  console.log('[cs][doubao-web-toolkit] export module ready');
 })();

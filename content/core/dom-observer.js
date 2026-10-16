@@ -1,7 +1,5 @@
-// dom-observer.js — MutationObserver 封装
 (function () {
   'use strict';
-
   const dwt = window.dwt = window.dwt || {};
   dwt.domObserver = {
     waitForElement(selector, opts) {
@@ -16,20 +14,8 @@
           if (el) { obs.disconnect(); resolve(el); }
         });
         obs.observe(root, { childList: true, subtree: true });
-        if (timeout > 0) {
-          setTimeout(() => { obs.disconnect(); reject(new Error('waitForElement timeout: ' + selector)); }, timeout);
-        }
+        if (timeout > 0) setTimeout(() => { obs.disconnect(); reject(new Error('waitForElement timeout: ' + selector)); }, timeout);
       });
-    },
-
-    onAttrChange(target, attr, cb) {
-      const obs = new MutationObserver((muts) => {
-        for (const m of muts) {
-          if (m.type === 'attributes' && m.attributeName === attr) cb();
-        }
-      });
-      obs.observe(target, { attributes: true, attributeFilter: [attr] });
-      return () => obs.disconnect();
     },
   };
 })();

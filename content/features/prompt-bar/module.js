@@ -8,8 +8,8 @@
   let prompts = [
     { label: '翻译英文', value: '请翻译成英文' },
     { label: '总结摘要', value: '请为上面的内容写一段 100 字的摘要' },
-    { label: '改写优化', value: '请帮我改写这段话，让它更流畅专业' },
-    { label: 'JSON 格式', value: '请以严格的 JSON 格式输出，不要包含 markdown 代码块标记' },
+    { label: '改写优化', value: '请帮我改写这段话,让它更流畅专业' },
+    { label: 'JSON 格式', value: '请以严格的 JSON 格式输出,不要包含 markdown 代码块标记' },
   ];
 
   async function load() {
@@ -44,12 +44,8 @@
     });
   }
 
-  dwt.promptBarModule = {
-    mount,
-    load,
-    getPrompts: () => prompts,
-  };
+  dwt.promptBarModule = { mount, load, getPrompts: () => prompts };
 
   load().then(mount);
-  console.log('[doubao-web-toolkit] prompt-bar module ready');
+  console.log('[cs][doubao-web-toolkit] prompt-bar module ready');
 })();

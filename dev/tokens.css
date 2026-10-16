@@ -1,0 +1,15 @@
+/* 开发与页面调优共用的尺寸 token。改间距、字号、圆角时先改这里。 */
+:root {
+  --ext-gap: 6px;
+  --ext-radius: 6px;
+  --ext-font: 13px;
+  --ext-font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ext-z-overlay: 2147483000;
+  --ext-panel-width: 280px;
+  --ext-popup-frame-width: 360px;
+  --ext-popup-frame-height: 640px;
+  --ext-color-text: #1a1a1a;
+  --ext-color-muted: #666;
+  --ext-color-primary: #2d72de;
+  --ext-color-border: #d0d7de;
+}

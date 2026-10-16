@@ -7,6 +7,22 @@
     // 输入框 —— ProseMirror (tiptap 编辑器)
     input: '.ProseMirror',
 
+    // AI 回复内容容器 (用于导出 / 来源标注)
+    aiContent: '[class*="conversation-message-content-padding-right"]',
+
+    // 用户消息气泡
+    userBubble: '[class*="bg-g-send-msg-bubble-bg"]',
+
+    // 消息列表根容器 (用于导出 / source-inspector 等模块限定搜索范围)
+    messageList: '[class*="v_list_scroller"], [class*="message-list"], [class*="scroller"]',
+
+    // 真实滚动容器选择器 (豆包聊天区滚动发生在内部 div.v_list_scroller-* 上)
+    // 说明: window 不滚动, 必须用此选择器找到内部容器, 否则 scrollTop 恒为 0
+    scrollerCandidates: '[class*="v_list_scroller"], [class*="message-list"], [class*="scroller"]',
+
+    // 左侧会话列表容器 (用于对话管理)
+    conversationList: '[class*="conversation-list"], [class*="session-list"]',
+
     // 发送按钮 —— 特征匹配: disabled=false + has svg + top>550 + 靠右
     sendMatch: (btn) => {
       const r = btn.getBoundingClientRect();
@@ -87,6 +103,47 @@
           }
         }, 200);
       });
+    },
+
+    // 找到豆包聊天区的真实滚动容器 (优先 v_list_scroller; 取可滚动且面积最大者)
+    // 说明: 豆包 window 不滚动, 内部容器才滚动; 此函数供所有需要滚动/定位消息的模块复用
+    _scrollerCache: null,
+    _scrollerBoundEl: null,
+    getScroller() {
+      // 缓存有效 (元素仍在 DOM 中) 直接返回
+      if (this._scrollerCache && this._scrollerCache.isConnected) return this._scrollerCache;
+      const sel = this._overrides.scrollerCandidates || DEFAULTS.scrollerCandidates;
+      let best = null;
+      let bestArea = 0;
+      document.querySelectorAll(sel).forEach((el) => {
+        // 不可滚动 (高度相等或几乎相等) 的容器跳过
+        if (el.scrollHeight <= el.clientHeight + 20) return;
+        const r = el.getBoundingClientRect();
+        const area = r.width * r.height;
+        if (area > bestArea) { bestArea = area; best = el; }
+      });
+      this._scrollerCache = best;
+      return best;
+    },
+
+    // 获取消息列表根容器 (优先真实滚动容器, 无则 document.body)
+    getMessageList() {
+      const sc = this.getScroller();
+      if (sc) return sc;
+      // 兜底: 用 messageList 选择器 (面积最大的候选)
+      const sel = this._overrides.messageList || DEFAULTS.messageList;
+      let best = null, bestArea = 0;
+      document.querySelectorAll(sel).forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const area = r.width * r.height;
+        if (area > bestArea) { bestArea = area; best = el; }
+      });
+      return best || document.body;
+    },
+
+    // 清除内部缓存 (切换会话/路由变化时调用, 保证下次 getScroller 重新探测)
+    invalidate() {
+      this._scrollerCache = null;
     },
   };
 })();

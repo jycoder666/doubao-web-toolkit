@@ -1,60 +1,59 @@
-const FEATURE_DEFS = [
-  { id: 'debugPanel', label: '调试面板（开发依赖，必开）' },
-  { id: 'batchInput', label: '批量输入 + 验证码暂停（用户原创）' },
-  { id: 'export', label: '对话导出（Markdown 单会话 + JSON 全量）' },
-  { id: 'navigator', label: '对话导航 pill 条' },
-  { id: 'promptBar', label: '提示词快捷条' },
-  { id: 'theme', label: '主题切换（深色/浅色）' },
-  { id: 'enhance', label: '自动滚动 / 悬浮按钮' },
-  { id: 'sourceInspector', label: '联网来源标注' },
-];
+// options.js — 配置页逻辑: 功能开关 + 批量输入模板 + 全局设置
+const FEATURE_KEYS = {
+  'feat-source': 'dwt_source_inspector', // 联网来源标注 (默认开)
+  'feat-input': 'dwt_enter_swap',        // 输入增强 (默认开)
+  'feat-conv': 'dwt_conv_manager',       // 对话管理 (默认关)
+  'feat-readmark': 'dwt_reading_mark',   // 阅读位置标记 (默认开)
+  'feat-digest': 'dwt_chat_digest',      // 对话摘要 (默认关)
+  'feat-debug': 'dwt_debug_panel',       // 调试面板 (默认开)
+};
 
-const $features = document.getElementById('features');
-const $msg = document.getElementById('msg');
+// 默认关闭的功能 (其余默认开启)
+const DEFAULT_OFF = ['dwt_conv_manager', 'dwt_chat_digest'];
 
 async function load() {
-  const { dwt_features, dwt_batch_json, dwt_batch_lines, dwt_min_interval, dwt_reply_timeout } =
-    await chrome.storage.local.get([
-      'dwt_features', 'dwt_batch_json', 'dwt_batch_lines', 'dwt_min_interval', 'dwt_reply_timeout'
-    ]);
+  // 批量输入 + 全局设置
+  const r = await chrome.storage.local.get([
+    'dwt_batch_json', 'dwt_batch_lines', 'dwt_min_interval', 'dwt_reply_timeout',
+    'dwt_dev_hot_reload',
+    ...Object.values(FEATURE_KEYS),
+  ]);
+  document.getElementById('batch-json').value = r.dwt_batch_json || '';
+  document.getElementById('batch-lines').value = r.dwt_batch_lines || '';
+  document.getElementById('min-interval').value = r.dwt_min_interval || 3;
+  document.getElementById('reply-timeout').value = r.dwt_reply_timeout || 180;
+  // 开发热重载: 默认关闭
+  document.getElementById('dev-hot-reload').checked = r.dwt_dev_hot_reload === true;
 
-  $features.innerHTML = '';
-  FEATURE_DEFS.forEach(f => {
-    const div = document.createElement('div');
-    div.className = 'feature-item';
-    div.innerHTML = `<label><input type="checkbox" data-id="${f.id}" ${dwt_features?.[f.id] ? 'checked' : ''}> ${f.label}</label>`;
-    $features.appendChild(div);
+  // 功能开关: 未设置时用默认值 (DEFAULT_OFF 中的默认关, 其余默认开)
+  Object.entries(FEATURE_KEYS).forEach(([id, key]) => {
+    const def = !DEFAULT_OFF.includes(key);
+    document.getElementById(id).checked = r[key] === undefined ? def : r[key] === true;
   });
-
-  document.getElementById('batch-json').value = dwt_batch_json || '';
-  document.getElementById('batch-lines').value = dwt_batch_lines || '';
-  document.getElementById('min-interval').value = dwt_min_interval || 3;
-  document.getElementById('reply-timeout').value = dwt_reply_timeout || 180;
 }
 
 document.getElementById('save').addEventListener('click', async () => {
-  const features = {};
-  $features.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    features[cb.dataset.id] = cb.checked;
-  });
-  await chrome.storage.local.set({
-    dwt_features: features,
+  const payload = {
     dwt_batch_json: document.getElementById('batch-json').value,
     dwt_batch_lines: document.getElementById('batch-lines').value,
     dwt_min_interval: Number(document.getElementById('min-interval').value),
     dwt_reply_timeout: Number(document.getElementById('reply-timeout').value),
+    dwt_dev_hot_reload: document.getElementById('dev-hot-reload').checked,
+  };
+  Object.entries(FEATURE_KEYS).forEach(([id, key]) => {
+    payload[key] = document.getElementById(id).checked;
   });
-  $msg.textContent = '已保存 ✓';
-  setTimeout(() => $msg.textContent = '', 2000);
+  await chrome.storage.local.set(payload);
+  const m = document.getElementById('msg');
+  m.textContent = '已保存 ✓ 刷新豆包页面后生效';
+  setTimeout(() => m.textContent = '', 2500);
 });
 
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-    document.querySelectorAll('#batch-input-config textarea').forEach(x => x.classList.add('hidden'));
-    t.classList.add('active');
-    document.getElementById('batch-' + t.dataset.tab).classList.remove('hidden');
-  });
-});
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('textarea').forEach(x => x.classList.add('hidden'));
+  t.classList.add('active');
+  document.getElementById('batch-' + t.dataset.tab).classList.remove('hidden');
+}));
 
 load();
