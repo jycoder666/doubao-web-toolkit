@@ -199,7 +199,11 @@
     if (!enabled) return;
     if (observer) return;
     observer = new MutationObserver(scheduleAnnotate);
-    const root = document.querySelector('[class*="message-list"]') || document.body;
+    // 原: document.querySelector('[class*="message-list"]') || document.body
+    // 问题: 豆包页面无 message-list, 始终回退 document.body, 观察范围过大.
+    // 修复: 通过 selectorManager.getMessageList() 取真实容器.
+    const sm = dwt.selectorManager;
+    const root = (sm && sm.getMessageList && sm.getMessageList()) || document.body;
     observer.observe(root, { childList: true, subtree: true });
     scheduleAnnotate();
     console.log('[dwt-source-inspector] mounted');

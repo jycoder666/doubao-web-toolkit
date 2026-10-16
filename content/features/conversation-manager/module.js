@@ -153,7 +153,9 @@
     if (document.getElementById(BAR_ID)) return;
     const bar = document.createElement('div');
     bar.id = BAR_ID;
-    bar.style.cssText = 'position:fixed;left:8px;bottom:96px;z-index:999998;background:#fff;'
+    // 位置: 右侧 right:12px, 底栏上方 bottom:128px (toggle 在 bottom:128px, 展开条在其下方)
+    // 原 left:8px 会被豆包左侧 280px 会话栏遮挡, 故移到右侧, 与其他扩展 UI 同侧
+    bar.style.cssText = 'position:fixed;right:12px;bottom:128px;z-index:999998;background:#fff;'
       + 'border:1px solid #d0d7de;border-radius:8px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);'
       + 'font-size:11px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:none;flex-direction:column;gap:6px;width:150px;';
     bar.innerHTML = '<b>对话管理</b>'
@@ -178,12 +180,12 @@
     });
     bar.addEventListener('change', updateCount);
 
-    // 悬浮入口按钮
+    // 悬浮入口按钮 (也移到右侧, 在 enhance-btn bottom:96px 之下, 留 20px 间距)
     const toggle = document.createElement('button');
     toggle.id = 'dwt-conv-toggle';
     toggle.textContent = '🗂';
     toggle.title = '对话管理';
-    toggle.style.cssText = 'position:fixed;left:52px;bottom:56px;z-index:999998;width:32px;height:32px;'
+    toggle.style.cssText = 'position:fixed;right:12px;bottom:128px;z-index:999998;width:32px;height:32px;'
       + 'border-radius:50%;border:1px solid #d0d7de;background:#fff;cursor:pointer;'
       + 'box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:14px;line-height:1;';
     toggle.onclick = () => {

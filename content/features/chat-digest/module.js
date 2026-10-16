@@ -23,7 +23,11 @@
       try { return dwt.exportModule.collectMessages(); } catch (_) { /* fall through */ }
     }
     const results = [];
-    const list = document.querySelector('[class*="message-list"]') || document;
+    // 原: document.querySelector('[class*="message-list"]') || document
+    // 问题: 豆包页面无 message-list, 回退到 document 导致全页范围搜索.
+    // 修复: 通过 selectorManager.getMessageList() 取真实容器.
+    const sm = dwt.selectorManager;
+    const list = (sm && sm.getMessageList && sm.getMessageList()) || document.body;
     const seen = new Set();
     list.querySelectorAll(SEL_USER_BUBBLE).forEach((b) => {
       const t = (b.innerText || '').trim();

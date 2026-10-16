@@ -1,5 +1,10 @@
 // export/module.js — 对话导出: Markdown 单会话 + JSON 全量
 // 传统脚本: IIFE + window.dwt
+// 顶部维护:
+//   - 原实现用 [class*="message-list"] 限定搜索范围, 但豆包页面上此 class 不存在,
+//     导致 collectMessages 始终返回空数组, 导出"未找到对话内容"。
+//   - 修复: 通过 dwt.selectorManager.getMessageList() 取真实容器 (优先内部滚动容器
+//     div.v_list_scroller-*, 无则 document.body)。
 (function () {
   'use strict';
 
@@ -8,11 +13,17 @@
   const SEL_USER_BUBBLE = '[class*="bg-g-send-msg-bubble-bg"]';
   const SEL_AI_CONTENT = '[class*="conversation-message-content-padding-right"]';
 
+  // 取消息列表根容器 (优先真实滚动容器, 无则 document.body)
+  function getMsgList() {
+    const sm = dwt.selectorManager;
+    if (sm && sm.getMessageList) return sm.getMessageList();
+    return document.body;
+  }
+
   function collectMessages() {
     const results = [];
     const visited = new Set();
-    const list = document.querySelector('[class*="message-list"]');
-    if (!list) return results;
+    const list = getMsgList();
 
     const userBubbles = list.querySelectorAll(SEL_USER_BUBBLE);
     userBubbles.forEach((b) => {
