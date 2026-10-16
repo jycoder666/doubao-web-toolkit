@@ -1,17 +1,16 @@
-// enhance/module.js — 自动滚动到底部 + 悬浮快捷按钮
+// enhance/module.js — 自动滚动跟随 (不再渲染悬浮按钮)
 // 顶部维护:
-//   - 原实现用 [class*="message-list"] 作滚动容器, 但豆包页面上不存在此 class,
-//     导致 scrollToBottom 回退到 documentElement.scrollTo → 点击无效 (因为豆包
-//     真正滚动的是内部 div.v_list_scroller-* 容器, 而 window 不滚动)。
-//   - 修复: 通过 selectorManager.getScroller() 获取真实滚动容器后再滚动。
-//   - 按钮位置: 从左侧 left:12px 移到右侧 right:12px, 与 navigator / prompt-bar 等
-//     保持同侧, 避免左侧会话栏遮挡。
+//   - 历史版本渲染了一个右下角 ⬇ 悬浮按钮, 但豆包本身已有「拉到最底」功能,
+//     两者重复且视觉干扰, 故移除按钮, 仅保留「自动跟随」逻辑: 当用户已滚到底部
+//     附近 (<200px) 时, 新消息出现自动追随, 用户主动上滑查看历史时不干扰。
+//   - 真实滚动容器: selectorManager.getScroller() 返回 div.v_list_scroller-*
+//     (豆包 window 不滚动, 内部容器才滚动), 回退兜底面积最大可滚动元素。
 (function () {
   'use strict';
 
   const dwt = window.dwt = window.dwt || {};
 
-  // ---------- 滚动工具: 必须通过 selectorManager.getScroller() 拿真实容器 ----------
+  // ---------- 滚动工具 ----------
   function getScroller() {
     const sm = dwt.selectorManager;
     if (sm && sm.getScroller) {
@@ -29,58 +28,43 @@
     return best;
   }
 
-  // 滚动聊天区到底部 (smooth=true 平滑滚动, false 直接跳转)
   function scrollToBottom(smooth) {
     const sc = getScroller();
     const target = sc || document.documentElement;
     target.scrollTo({ top: target.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
   }
 
-  // ---------- 悬浮按钮 ----------
-  function mount() {
-    if (document.getElementById('dwt-enhance-btn')) return;
-    const btn = document.createElement('button');
-    btn.id = 'dwt-enhance-btn';
-    btn.textContent = '⬇';
-    btn.title = '滚动到最底部';
-    // 位置: 右侧 right:12px, 底栏上方 bottom:96px (debug-panel toggle 在 bottom:12px,
-    // prompt-bar 在 bottom:64px, 留 28px 间距避免重叠)
-    btn.style.cssText = 'position:fixed;bottom:96px;right:12px;z-index:999998;width:32px;height:32px;border-radius:50%;border:1px solid #d0d7de;background:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:14px;line-height:1;';
-    btn.onclick = () => scrollToBottom(true);
-    document.body.appendChild(btn);
-  }
-
-  // ---------- 自动滚动: 新消息出现时, 若用户已在底部附近则自动滚到底 ----------
+  // ---------- 自动跟随: 新消息出现时, 若用户已在底部附近则自动跟随 ----------
   let autoEnabled = true;
   let lastHeight = 0;
+  let observer = null;
 
   function observeChanges() {
+    if (observer) observer.disconnect();
     const sc = getScroller();
     if (!sc) return;
-    const obs = new MutationObserver(() => {
+    observer = new MutationObserver(() => {
       if (!autoEnabled) return;
       const h = sc.scrollHeight;
       if (h !== lastHeight) {
         lastHeight = h;
-        // 距底部 < 200px 视为"用户在底部附近", 自动跟随
+        // 距底部 < 200px 视为"用户在底部附近", 自动跟随; 若用户正在往上看历史, 不打扰
         if (sc.scrollHeight - sc.scrollTop - sc.clientHeight < 200) {
           sc.scrollTop = sc.scrollHeight;
         }
       }
     });
-    obs.observe(sc, { childList: true, subtree: true, characterData: true });
+    observer.observe(sc, { childList: true, subtree: true, characterData: true });
   }
 
   dwt.enhanceModule = {
-    mount, scrollToBottom, observeChanges, getScroller,
+    scrollToBottom, observeChanges, getScroller,
     setAuto: (v) => autoEnabled = v,
   };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { mount(); observeChanges(); });
-  } else {
-    mount(); observeChanges();
-  }
+  // 每 4 秒重新绑定一次 (防止容器被重渲染后 observer 丢失)
+  observeChanges();
+  setInterval(observeChanges, 4000);
 
-  console.log('[doubao-web-toolkit] enhance module ready');
+  console.log('[doubao-web-toolkit] enhance module ready (auto-follow only, no float btn)');
 })();
