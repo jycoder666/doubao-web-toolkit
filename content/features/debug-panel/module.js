@@ -33,7 +33,7 @@
       <div><b>1. DOM 选择器表</b>：列出扩展用于定位豆包页面元素的选择器。修改后点该行的「保存」，即写入本地覆盖值（存于 <code>chrome.storage.local.dwt_selectors</code>），无需改代码；点「重置」恢复默认。</div>
       <div><b>2. 元素选择模式</b>：点按钮进入拾取状态，鼠标移动到页面元素会高亮描边，<b>点击目标元素</b>即自动生成其 CSS 选择器，并复制到剪贴板、回填到下方「回填到」下拉选中的那项；按 <b>ESC</b> 或再次点击按钮退出。</div>
       <div><b>3. 实时状态</b>：「回复生成中」= 豆包是否正在流式输出；「验证码」= 是否检测到验证码元素。用于排查批量输入为何暂停。</div>
-      <div><b>4. 打开方式</b>：页面右下角「⚙ DWT」按钮，或在扩展弹窗点「调试面板」。</div>
+      <div><b>4. 打开方式</b>：页面右下角「\u2699 DWT」按钮，或在扩展弹窗点「调试面板」。</div>
     </div>
   </details>
 
@@ -61,7 +61,7 @@
     <div id="dwt-pick-hint" style="margin-top:6px;font-size:11px;color:#888;"></div>
   </div>
 </div>
-<button id="${TOGGLE_ID}" style="position:fixed;bottom:12px;right:12px;z-index:999999;padding:6px 10px;background:#2d72de;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;box-shadow:0 2px 8px rgba(45,114,222,.3);">⚙ DWT</button>`;
+<button id="${TOGGLE_ID}" style="position:fixed;bottom:12px;right:12px;z-index:999999;padding:6px 10px;background:#2d72de;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;box-shadow:0 2px 8px rgba(45,114,222,.3);">\u2699 DWT</button>`;
 
   let pickMode = false;         // 是否处于元素拾取状态
   let hoverBox = null;          // 悬停高亮框

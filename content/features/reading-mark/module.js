@@ -169,7 +169,7 @@
       + 'background:#1f6feb;color:#fff;border-radius:8px;padding:8px 12px;font-size:12px;'
       + 'box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;'
       + 'font-family:-apple-system,Segoe UI,Roboto,sans-serif;';
-    tip.innerHTML = '<span>📌 上次读到第 ' + (anchor.idx + 1) + ' 条</span>'
+    tip.innerHTML = '<span>\u{1F4CC} 上次读到第 ' + (anchor.idx + 1) + ' 条</span>'
       + '<button id="dwt-readmark-go" title="跳回上次阅读的那条消息" style="border:0;border-radius:5px;'
       + 'padding:3px 8px;cursor:pointer;background:#fff;color:#1f6feb;font-size:12px;">跳回该条</button>'
       + '<button id="dwt-readmark-close" title="关闭提示, 并按当前位置继续记录" style="border:0;'

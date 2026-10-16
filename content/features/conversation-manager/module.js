@@ -183,7 +183,7 @@
     // 悬浮入口按钮 (也移到右侧, 在 enhance-btn bottom:96px 之下, 留 20px 间距)
     const toggle = document.createElement('button');
     toggle.id = 'dwt-conv-toggle';
-    toggle.textContent = '🗂';
+    toggle.textContent = '\u{1F5C2}';
     toggle.title = '对话管理';
     toggle.style.cssText = 'position:fixed;right:12px;bottom:128px;z-index:999998;width:32px;height:32px;'
       + 'border-radius:50%;border:1px solid #d0d7de;background:#fff;cursor:pointer;'

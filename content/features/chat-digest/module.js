@@ -114,7 +114,7 @@
       + 'box-shadow:0 8px 28px rgba(0,0,0,.2);font-size:12px;line-height:1.6;'
       + 'font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#24292f;';
     panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
-      + '<b style="font-size:13px;">🧾 对话摘要</b>'
+      + '<b style="font-size:13px;">\u{1F9FE} 对话摘要</b>'
       + '<button id="dwt-digest-x" style="border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;">×</button></div>'
       + '<div style="color:#57606a;margin-bottom:8px;">轮次 ' + d.rounds + ' · 消息 ' + d.msgs + ' · 约 ' + d.chars + ' 字</div>'
       + '<div style="display:flex;gap:6px;margin-bottom:8px;">'
@@ -153,7 +153,7 @@
     if (document.getElementById(BTN_ID)) return;
     const btn = document.createElement('button');
     btn.id = BTN_ID;
-    btn.textContent = '🧾';
+    btn.textContent = '\u{1F9FE}';
     btn.title = '生成对话摘要';
     btn.style.cssText = 'position:fixed;right:12px;bottom:56px;z-index:999998;width:32px;height:32px;'
       + 'border-radius:50%;border:1px solid #d0d7de;background:#fff;cursor:pointer;'

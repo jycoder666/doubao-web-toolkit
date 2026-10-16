@@ -38,17 +38,17 @@
       #dwt-nav {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
+      #dwt-nav .dwt-nav-rows { overflow-x:hidden; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar { width: 4px; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar-thumb { background:#d0d7de; border-radius:2px; }
       #dwt-nav .dwt-nav-rows::-webkit-scrollbar-track { background:transparent; }
       #dwt-nav .dwt-nav-row {
         display:flex; align-items:center; gap:6px;
         padding:5px 6px; border-radius:6px; cursor:pointer;
-        transition: background .12s ease, transform .12s ease;
+        transition: background .12s ease;
       }
       #dwt-nav .dwt-nav-row:hover {
         background:#f0f4ff;
-        transform: translateX(2px);
       }
       #dwt-nav .dwt-nav-row.dwt-nav-current {
         background:#e8f0ff;
@@ -73,7 +73,8 @@
   }
 
   function renderItems() {
-    const box = document.getElementById('dwt-nav-rows');
+    // 注: 这里用 class 选择器, 因为面板内容器是 class 不是 id
+    const box = document.querySelector('#' + PANEL_ID + ' .dwt-nav-rows');
     if (!box) return;
     const kw = keyword.trim().toLowerCase();
     const rows = [];
@@ -87,7 +88,7 @@
       );
     });
     box.innerHTML = rows.length ? rows.join('') : '<div style="color:#8b949e;padding:6px;text-align:center;font-size:11px;">无匹配</div>';
-    const footer = document.getElementById('dwt-nav-footer');
+    const footer = document.querySelector('#' + PANEL_ID + ' .dwt-nav-footer');
     if (footer) footer.textContent = '共 ' + navList.length + ' 条';
   }
 
@@ -141,15 +142,15 @@
     nav.innerHTML =
       // 头部: 标题 + 折叠按钮
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-      + '<div style="font-size:13px;font-weight:600;color:#1f2328;letter-spacing:.2px;">� 导航</div>'
+      + '<div style="font-size:13px;font-weight:600;color:#1f2328;letter-spacing:.2px;">\u{1F4CC} 导航</div>'
       + '<span id="dwt-nav-collapse" title="折叠/展开" style="cursor:pointer;font-size:14px;color:#8b949e;'
       + 'padding:2px 6px;border-radius:4px;transition:background .12s;"'
       + 'onmouseover="this.style.background=\'#f0f2f5\'" onmouseout="this.style.background=\'transparent\'">'
-      + (collapsed ? '▶' : '◀') + '</span>'
+      + (collapsed ? '\u25B6' : '\u25C0') + '</span>'
       + '</div>'
       // 搜索框
       + '<div class="dwt-nav-body">'
-      + '<input id="dwt-nav-search" type="text" placeholder="🔍 搜索提问…" '
+      + '<input id="dwt-nav-search" type="text" placeholder="\u{1F50D} 搜索提问…" '
       + 'style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:6px 10px;border:1px solid #d0d7de;'
       + 'border-radius:8px;font-size:12px;outline:none;transition:border-color .15s, box-shadow .15s;"'
       + 'onfocus="this.style.borderColor=\'#2d72de\';this.style.boxShadow=\'0 0 0 3px rgba(45,114,222,.15)\'"'
@@ -168,7 +169,7 @@
     collapse.addEventListener('click', () => {
       collapsed = !collapsed;
       nav.classList.toggle('dwt-nav-collapsed', collapsed);
-      collapse.textContent = collapsed ? '▶' : '◀';
+      collapse.textContent = collapsed ? '\u25B6' : '\u25C0';
     });
 
     // 搜索
@@ -203,12 +204,54 @@
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
+    document.addEventListener('DOMContentLoaded', () => { mount(); startLiveWatch(); });
   } else {
     mount();
+    startLiveWatch();
   }
-  // 每 8 秒重扫一次 (适配流式输出, 新的用户提问会被发现)
-  setInterval(mount, 8000);
+
+  // MutationObserver: 监听气泡出现/变化, 实时追加到列表 (不用等 8 秒轮询)
+  let liveObserver = null;
+  function startLiveWatch() {
+    if (liveObserver) return;
+    liveObserver = new MutationObserver((mutations) => {
+      let dirty = false;
+      for (const m of mutations) {
+        if (m.type === 'childList') {
+          for (const n of m.addedNodes) {
+            if (n.nodeType === 1 && (n.matches?.(SEL_USER_BUBBLE) || n.querySelector?.(SEL_USER_BUBBLE))) {
+              dirty = true; break;
+            }
+          }
+        } else if (m.type === 'characterData') {
+          // 流式输出中已有气泡内容变化 → 也算脏 (但不常触发, 节流)
+        }
+        if (dirty) break;
+      }
+      if (dirty) refreshList();
+    });
+    // 挂在 body 上, 监听整棵树
+    liveObserver.observe(document.body, { childList: true, subtree: true, characterData: false });
+  }
+
+  // 每次全量重扫 + 重绘 (因为豆包可能回收/重建气泡 node, 不能只比条数)
+  let refreshTimer = null;
+  function refreshList() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      const list = collectUserQuestions();
+      if (!list.length) {
+        const p = document.getElementById(PANEL_ID);
+        if (p) p.remove();
+        navList = [];
+        return;
+      }
+      navList = list;
+      const panel = document.getElementById(PANEL_ID);
+      if (!panel) mount();
+      else { renderItems(); markCurrent(); }
+    }, 150);  // 150ms 防抖, 避免流式输出时连刷
+  }
   // 滚动时更新"当前"高亮, 500ms 防抖
   let markTimer = null;
   document.addEventListener('scroll', () => {

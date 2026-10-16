@@ -115,7 +115,7 @@
     const badge = document.createElement('span');
     badge.className = BADGE_CLASS;
     badge.dataset.idx = String(index);
-    badge.textContent = '🔗 来源 ' + sources.length + (highCount ? ' · 权威 ' + highCount : '');
+    badge.textContent = '\u{1F517} 来源 ' + sources.length + (highCount ? ' · 权威 ' + highCount : '');
     badge.style.cssText = 'display:inline-block;margin:4px 0 0 0;padding:2px 8px;border-radius:10px;'
       + 'background:#eef3fd;color:#2d72de;border:1px solid #c8d8f8;font-size:11px;cursor:pointer;'
       + 'font-family:-apple-system,Segoe UI,Roboto,sans-serif;user-select:none;';
