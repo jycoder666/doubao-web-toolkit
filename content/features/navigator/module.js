@@ -3,7 +3,7 @@
 //   - 2026-10-16 美化: 宽 200px / 字号 12px / 圆角徽标序号 / hover 微动效 /
 //     折叠按钮 / 底部分数统计 / backdrop 毛玻璃 / 自定义细滚动条。
 //   - 定位右侧 (豆包左侧有 280px 会话栏), top:84px 避开顶部栏。
-//   - 自动每 8 秒重扫一次提问列表, 适配流式输出场景。
+//   - 打开对话时自动从顶扫到底，一次收齐当前会话里已加载的用户提问。
 (function () {
   'use strict';
 
@@ -16,14 +16,63 @@
   let keyword = '';
   let collapsed = false;
 
-  function collectUserQuestions() {
-    const bubbles = document.querySelectorAll(SEL_USER_BUBBLE);
-    const list = [];
-    bubbles.forEach((b) => {
-      const t = (b.innerText || '').trim();
-      if (t) list.push({ text: t.slice(0, 80), node: b });
+  let scanning = false;
+
+  function bubbleText(node) {
+    return (node.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  }
+
+  function visibleTexts() {
+    const out = [];
+    document.querySelectorAll(SEL_USER_BUBBLE).forEach((node) => {
+      const text = bubbleText(node);
+      if (text) out.push(text);
     });
-    return list;
+    return out;
+  }
+
+  function sameSlice(a, a0, b, b0, n) {
+    for (let i = 0; i < n; i++) {
+      if (a[a0 + i] !== b[b0 + i]) return false;
+    }
+    return true;
+  }
+
+  // 虚拟列表每次只挂载视口附近的气泡。按重叠把新窗口接到已收集列表的头部或尾部。
+  function mergeTexts(base, visible) {
+    if (!visible.length) return base;
+    if (!base.length) return visible.slice();
+    if (visible.length <= base.length) {
+      for (let i = 0; i <= base.length - visible.length; i++) {
+        if (sameSlice(base, i, visible, 0, visible.length)) return base;
+      }
+    }
+    const maxK = Math.min(base.length, visible.length);
+    for (let k = maxK; k >= 1; k--) {
+      if (sameSlice(base, base.length - k, visible, 0, k)) return base.concat(visible.slice(k));
+    }
+    for (let k = maxK; k >= 1; k--) {
+      if (sameSlice(visible, visible.length - k, base, 0, k)) {
+        return visible.slice(0, visible.length - k).concat(base);
+      }
+    }
+    return base.concat(visible);
+  }
+
+  function getScroller() {
+    const fromManager = dwt.selectorManager?.getScroller?.();
+    if (fromManager) return fromManager;
+    return document.querySelector('[class*="v_list_scroller"]');
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function collectUserQuestions() {
+    return navList.length
+      ? navList.map((item) => ({ text: item.text }))
+      : visibleTexts().map((text) => ({ text }));
   }
 
   function escapeHtml(s) {
@@ -166,23 +215,24 @@
     });
     box.innerHTML = rows.length ? rows.join('') : '<div style="color:#8b949e;padding:6px;text-align:center;font-size:11px;">无匹配</div>';
     const footer = document.querySelector('#' + PANEL_ID + ' .dwt-nav-footer');
-    if (footer) footer.textContent = '共 ' + navList.length + ' 条';
+    if (footer) footer.textContent = scanning ? '正在读取全部提问…' : ('共 ' + navList.length + ' 条');
   }
 
   // 高亮当前视口内最靠上的用户提问 (让用户知道"当前读到哪一条")
   function markCurrent() {
+    if (scanning) return;
     const rows = document.querySelectorAll('#dwt-nav .dwt-nav-row');
     if (!rows.length || !navList.length) return;
-    // 找到视口内最靠上的用户节点
-    const scroller = dwt.selectorManager?.getScroller?.();
+    const scroller = getScroller();
     const viewTop = scroller ? scroller.getBoundingClientRect().top : 0;
     const viewH = scroller ? scroller.clientHeight : window.innerHeight;
-    let currentIdx = -1;
-    for (let i = 0; i < navList.length; i++) {
-      const r = navList[i].node.getBoundingClientRect();
-      const rel = r.top - viewTop;
-      if (rel >= -40 && rel <= viewH) { currentIdx = i; break; }
-    }
+    let currentText = '';
+    document.querySelectorAll(SEL_USER_BUBBLE).forEach((node) => {
+      if (currentText) return;
+      const rel = node.getBoundingClientRect().top - viewTop;
+      if (rel >= -40 && rel <= viewH) currentText = bubbleText(node);
+    });
+    const currentIdx = currentText ? navList.findIndex((item) => item.text === currentText) : -1;
     rows.forEach((row) => {
       if (currentIdx >= 0 && Number(row.dataset.idx) === currentIdx) {
         row.classList.add('dwt-nav-current');
@@ -192,14 +242,155 @@
     });
   }
 
+  function findBubble(text) {
+    let found = null;
+    document.querySelectorAll(SEL_USER_BUBBLE).forEach((node) => {
+      if (!found && bubbleText(node) === text) found = node;
+    });
+    return found;
+  }
+
+  function highlight(node) {
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const orig = node.style.outline;
+    node.style.outline = '2px solid #2d72de';
+    node.style.transition = 'outline .3s';
+    setTimeout(() => { node.style.outline = orig; }, 1500);
+  }
+
+  function stepSize(sc) {
+    return Math.max(160, Math.floor(sc.clientHeight * 0.45));
+  }
+
+  function nudge(sc, y) {
+    sc.scrollTop = y;
+    sc.dispatchEvent(new Event('scroll', { bubbles: true }));
+  }
+
+  // 虚拟列表不会在改 scrollTop 的同一帧换气泡，等到文本变了或超时再采样。
+  function waitForWindow(previousKey, timeout) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const tick = () => {
+        const now = visibleTexts().join('\n');
+        const elapsed = Date.now() - start;
+        if ((previousKey && now !== previousKey && elapsed >= 40) || elapsed >= timeout) resolve(now);
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async function jumpTo(text) {
+    let node = findBubble(text);
+    const sc = getScroller();
+    if (!node && sc) {
+      const step = stepSize(sc);
+      let y = 0;
+      let guard = 0;
+      let lastH = -1;
+      let stuck = 0;
+      let prev = '';
+      while (!node && guard++ < 160) {
+        nudge(sc, y);
+        prev = await waitForWindow(prev, 280);
+        node = findBubble(text);
+        if (node) break;
+        const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+        if (y >= max - 2) {
+          if (sc.scrollHeight === lastH) stuck++;
+          else stuck = 0;
+          lastH = sc.scrollHeight;
+          if (stuck >= 2) break;
+          y = 0;
+        } else {
+          lastH = sc.scrollHeight;
+          y = Math.min(max, y + step);
+        }
+      }
+    }
+    if (node) highlight(node);
+  }
+
+  // 从顶扫到底。步长小于一屏，保证相邻窗口有重叠，漏掉的气泡不会被接丢。
+  async function sweep(sc) {
+    let texts = [];
+    let y = 0;
+    let guard = 0;
+    let prev = '';
+    while (guard++ < 160) {
+      nudge(sc, y);
+      prev = await waitForWindow(prev, y === 0 ? 700 : 280);
+      texts = mergeTexts(texts, visibleTexts());
+      const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+      if (y >= max - 2) break;
+      y = Math.min(max, y + stepSize(sc));
+    }
+    return texts;
+  }
+
+  // 豆包把“用户滚到顶”才当成要拉更早的消息。程序改 scrollTop 不会触发，要走它自己的滚动回调。
+  function requestOlder(sc) {
+    const fiberKey = Object.keys(sc).find((k) => k.startsWith('__reactFiber'));
+    let fiber = fiberKey ? sc[fiberKey] : null;
+    for (let i = 0; fiber && i < 8; i++) {
+      const node = fiber.stateNode;
+      const fn = node && node.props && node.props.onScroll;
+      if (typeof fn === 'function' && String(fn).indexOf('isUserScrolling') >= 0) {
+        try {
+          fn.call(node, { x: 0, y: 0 }, { forward: false, isUserScrolling: true, isMouseDown: false });
+          return;
+        } catch (e) { /* 页面改版后走滚轮兜底 */ }
+      }
+      fiber = fiber.return;
+    }
+    sc.dispatchEvent(new WheelEvent('wheel', { deltaY: -800, bubbles: true, cancelable: true }));
+  }
+
+  async function pullOlder(sc) {
+    const before = sc.scrollHeight;
+    nudge(sc, 0);
+    requestOlder(sc);
+    await sleep(1000);
+    return sc.scrollHeight > before + 80;
+  }
+
+  async function loadAll() {
+    if (scanning) return;
+    const sc = getScroller();
+    if (!sc || sc.scrollHeight <= sc.clientHeight + 40) {
+      navList = visibleTexts().map((text) => ({ text }));
+      if (navList.length && !document.getElementById(PANEL_ID)) mount();
+      else { renderItems(); markCurrent(); }
+      return;
+    }
+    scanning = true;
+    renderItems();
+    const saved = sc.scrollTop;
+    let texts = [];
+    try {
+      let pulls = 0;
+      do {
+        const pass = await sweep(sc);
+        if (pass.length >= texts.length) texts = pass;
+        pulls++;
+      } while (pulls < 8 && await pullOlder(sc));
+    } finally {
+      nudge(sc, saved);
+      navList = texts.map((text) => ({ text }));
+      scanning = false;
+    }
+    if (navList.length && !document.getElementById(PANEL_ID)) mount();
+    else { renderItems(); markCurrent(); }
+  }
+
   function mount() {
-    const list = collectUserQuestions();
-    if (!list.length) {
+    if (!navList.length) navList = visibleTexts().map((text) => ({ text }));
+    if (!navList.length) {
       const old = document.getElementById(PANEL_ID);
       if (old) old.remove();
       return;
     }
-    navList = list;
     injectStyles();
     const old = document.getElementById(PANEL_ID);
     if (old) old.remove();
@@ -256,13 +447,7 @@
       if (!el) return;
       const idx = Number(el.dataset.idx);
       const item = navList[idx];
-      if (item && item.node) {
-        item.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const orig = item.node.style.outline;
-        item.node.style.outline = '2px solid #2d72de';
-        item.node.style.transition = 'outline .3s';
-        setTimeout(() => { item.node.style.outline = orig; }, 1500);
-      }
+      if (item && item.text) jumpTo(item.text);
     });
 
     renderItems();
@@ -275,15 +460,18 @@
     markCurrent,
   };
 
+  // 必须先声明。document_idle 时 readyState 已不是 loading，会立刻调用 startLiveWatch。
+  let liveObserver = null;
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { mount(); startLiveWatch(); });
+    document.addEventListener('DOMContentLoaded', () => { mount(); startLiveWatch(); loadAll(); });
   } else {
     mount();
     startLiveWatch();
+    loadAll();
   }
 
   // MutationObserver: 监听气泡出现/变化, 实时追加到列表 (不用等 8 秒轮询)
-  let liveObserver = null;
   function startLiveWatch() {
     if (liveObserver) return;
     liveObserver = new MutationObserver((mutations) => {
@@ -309,16 +497,16 @@
   // 每次全量重扫 + 重绘 (因为豆包可能回收/重建气泡 node, 不能只比条数)
   let refreshTimer = null;
   function refreshList() {
+    if (scanning) return;
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
-      const list = collectUserQuestions();
-      if (!list.length) {
-        const p = document.getElementById(PANEL_ID);
-        if (p) p.remove();
-        navList = [];
-        return;
-      }
-      navList = list;
+      const visible = visibleTexts();
+      if (!visible.length) return;
+      const merged = mergeTexts(navList.map((item) => item.text), visible);
+      const changed = merged.length !== navList.length
+        || merged.some((text, i) => navList[i]?.text !== text);
+      if (!changed) { markCurrent(); return; }
+      navList = merged.map((text) => ({ text }));
       const panel = document.getElementById(PANEL_ID);
       if (!panel) mount();
       else { renderItems(); markCurrent(); applyDark(); }
@@ -331,5 +519,5 @@
     markTimer = setTimeout(markCurrent, 500);
   }, true);
 
-  console.log('[doubao-web-toolkit] navigator module ready (beautified v2)');
+  console.log('[cs][doubao-web-toolkit] navigator module ready (beautified v2)');
 })();

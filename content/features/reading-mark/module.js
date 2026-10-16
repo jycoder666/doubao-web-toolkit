@@ -281,7 +281,7 @@
     bindScroll();
     watchRouteChange();
     if (convId) tryResume();
-    console.log('[dwt-reading-mark] mounted, conv=', convId);
+    console.log('[cs][dwt-reading-mark] mounted, conv=', convId);
   }
 
   async function loadConfig() {
@@ -305,5 +305,5 @@
   // 先读配置 + 存储, 再挂载
   Promise.all([loadConfig(), loadStore()]).then(mount);
 
-  console.log('[doubao-web-toolkit] reading-mark module ready');
+  console.log('[cs][doubao-web-toolkit] reading-mark module ready');
 })();

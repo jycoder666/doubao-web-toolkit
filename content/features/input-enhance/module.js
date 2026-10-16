@@ -56,7 +56,7 @@
     if (boundInput) boundInput.removeEventListener('keydown', onKeydown, true);
     boundInput = pm;
     boundInput.addEventListener('keydown', onKeydown, true);
-    console.log('[dwt-input-enhance] bound keydown on input');
+    console.log('[cs][dwt-input-enhance] bound keydown on input');
   }
 
   // ---------- 功能 2: 模型记忆 ----------
@@ -109,7 +109,7 @@
     // 输入框是 React 动态渲染的, 定时重绑 (幂等)
     setInterval(bindInput, 3000);
     watchModel();
-    console.log('[dwt-input-enhance] mounted');
+    console.log('[cs][dwt-input-enhance] mounted');
   }
 
   dwt.inputEnhanceModule = {
@@ -122,5 +122,5 @@
 
   loadConfig().then(mount);
 
-  console.log('[doubao-web-toolkit] input-enhance module ready');
+  console.log('[cs][doubao-web-toolkit] input-enhance module ready');
 })();

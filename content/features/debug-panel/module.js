@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  const LOG = '[doubao-web-toolkit]';
+  const LOG = '[cs][doubao-web-toolkit]';
   const PANEL_ID = 'dwt-debug-panel';
   const TOGGLE_ID = 'dwt-panel-toggle';
 

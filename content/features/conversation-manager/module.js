@@ -214,7 +214,7 @@
     buildBar();
     refresh();
     setInterval(() => { if (enabled && panelOpen) injectChecks(); }, 4000);
-    console.log('[dwt-conv-manager] mounted');
+    console.log('[cs][dwt-conv-manager] mounted');
   }
 
   function unmount() {
@@ -240,5 +240,5 @@
 
   loadConfig().then(mount);
 
-  console.log('[doubao-web-toolkit] conversation-manager module ready');
+  console.log('[cs][doubao-web-toolkit] conversation-manager module ready');
 })();

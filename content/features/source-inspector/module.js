@@ -206,7 +206,7 @@
     const root = (sm && sm.getMessageList && sm.getMessageList()) || document.body;
     observer.observe(root, { childList: true, subtree: true });
     scheduleAnnotate();
-    console.log('[dwt-source-inspector] mounted');
+    console.log('[cs][dwt-source-inspector] mounted');
   }
 
   function unmount() {
@@ -235,5 +235,5 @@
 
   loadConfig().then(mount);
 
-  console.log('[doubao-web-toolkit] source-inspector module ready');
+  console.log('[cs][doubao-web-toolkit] source-inspector module ready');
 })();

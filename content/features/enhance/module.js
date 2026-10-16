@@ -66,5 +66,5 @@
   observeChanges();
   setInterval(observeChanges, 4000);
 
-  console.log('[doubao-web-toolkit] enhance module ready (auto-follow only, no float btn)');
+  console.log('[cs][doubao-web-toolkit] enhance module ready (auto-follow only, no float btn)');
 })();

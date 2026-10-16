@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  const LOG = '[doubao-web-toolkit]';
+  const LOG = '[cs][doubao-web-toolkit]';
   console.log(LOG, 'loaded on', location.href);
 
   // 从 storage 读功能开关 (默认都开)

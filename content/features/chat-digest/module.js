@@ -165,7 +165,7 @@
   function mount() {
     if (!enabled) return;
     buildButton();
-    console.log('[dwt-chat-digest] mounted');
+    console.log('[cs][dwt-chat-digest] mounted');
   }
 
   function unmount() {
@@ -190,5 +190,5 @@
 
   loadConfig().then(mount);
 
-  console.log('[doubao-web-toolkit] chat-digest module ready');
+  console.log('[cs][doubao-web-toolkit] chat-digest module ready');
 })();

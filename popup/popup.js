@@ -2,7 +2,11 @@
 const STATUS = document.getElementById('status');
 const BATCH_STATUS = document.getElementById('batch-status');
 
-function setStatus(msg) { STATUS.textContent = msg; setTimeout(() => STATUS.textContent = '', 2000); }
+function setStatus(msg) {
+  STATUS.textContent = msg;
+  if (msg) console.log('[popup]', msg);
+  setTimeout(() => STATUS.textContent = '', 2000);
+}
 function setBatchStatus(msg) { BATCH_STATUS.textContent = msg; }
 
 async function getActiveDoubaoTab() {

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Doubao Web Toolkit · UI 预览</title>
+  <link rel="stylesheet" href="/dev/tokens.css">
+  <link rel="stylesheet" href="/dev/preview.css">
+</head>
+<body>
+  <div class="toolbar">
+    <label>视口
+      <select id="view">
+        <option value="popup">弹窗 360×640</option>
+        <option value="wide">宽弹窗 480×640</option>
+        <option value="options">选项页</option>
+        <option value="overlay">浮层靶页</option>
+      </select>
+    </label>
+    <label>主题
+      <select id="theme">
+        <option value="light">亮</option>
+        <option value="dark">暗</option>
+      </select>
+    </label>
+    <label>状态
+      <select id="state">
+        <option value="default">默认</option>
+        <option value="loading">加载中</option>
+        <option value="empty">空数据</option>
+        <option value="error">错误</option>
+        <option value="long">长文本</option>
+      </select>
+    </label>
+    <label>宿主
+      <select id="host">
+        <option value="white">白底</option>
+        <option value="gray">灰底</option>
+        <option value="dirty">脏 CSS</option>
+      </select>
+    </label>
+    <button type="button" id="outline">轮廓</button>
+    <button type="button" id="metrics-toggle" class="on">度量</button>
+    <span class="hint">布局在这个页里调。权限、注入、Service Worker 仍要在 chrome://extensions 加载未打包目录验收。</span>
+  </div>
+
+  <div id="stage" class="stage host-white">
+    <div id="frame" class="frame popup">
+      <iframe id="surface" title="扩展界面预览" src="/popup/popup.html"></iframe>
+    </div>
+  </div>
+
+  <aside id="overlay" class="overlay">
+    <h2>debug overlay</h2>
+    <pre id="metrics">等待页面…</pre>
+    <div class="row">
+      <button type="button" id="copy">复制度量</button>
+      <span id="copy-note"></span>
+    </div>
+  </aside>
+
+  <script src="/dev/preview.js"></script>
+</body>
+</html>

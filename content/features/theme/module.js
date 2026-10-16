@@ -47,5 +47,5 @@
   };
 
   init();
-  console.log('[doubao-web-toolkit] theme module ready');
+  console.log('[cs][doubao-web-toolkit] theme module ready');
 })();

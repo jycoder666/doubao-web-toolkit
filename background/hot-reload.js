@@ -15,7 +15,7 @@
 (function () {
   'use strict';
 
-  const LOG = '[dwt-hot-reload]';
+  const LOG = '[bg][dwt-hot-reload]';
 
   // 需要监听的源码文件（相对扩展根目录）。
   // 覆盖 manifest + background + content + popup + options + lib，

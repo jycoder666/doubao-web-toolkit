@@ -47,5 +47,5 @@
   dwt.promptBarModule = { mount, load, getPrompts: () => prompts };
 
   load().then(mount);
-  console.log('[doubao-web-toolkit] prompt-bar module ready');
+  console.log('[cs][doubao-web-toolkit] prompt-bar module ready');
 })();

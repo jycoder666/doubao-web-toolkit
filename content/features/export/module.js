@@ -106,5 +106,5 @@
     else dwt.exportModule.exportMarkdown();
   });
 
-  console.log('[doubao-web-toolkit] export module ready');
+  console.log('[cs][doubao-web-toolkit] export module ready');
 })();
