@@ -106,6 +106,8 @@ document.getElementById('export-json').addEventListener('click', async () => {
 // ---------- 工具区块: 功能开关 ----------
 
 // 切换某个功能开关 (读写 chrome.storage.local + 通知 content script 立即生效)
+// 注意: 不能在 await 之后使用 e.currentTarget (事件派发结束后会被置为 null),
+// 因此由调用方把按钮元素与标签先取出来再传入, 保证异步流程中引用始终有效。
 async function toggleFeature(btn, key, defaultOn) {
   const r = await chrome.storage.local.get(key);
   const cur = r[key] === undefined ? defaultOn : r[key] === true;
@@ -119,22 +121,26 @@ async function toggleFeature(btn, key, defaultOn) {
 
 document.getElementById('toggle-source').dataset.label = '来源标注';
 document.getElementById('toggle-source').addEventListener('click', (e) => {
-  toggleFeature(e.currentTarget, 'dwt_source_inspector', true);
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_source_inspector', true);
 });
 
 document.getElementById('toggle-conv').dataset.label = '对话管理';
 document.getElementById('toggle-conv').addEventListener('click', (e) => {
-  toggleFeature(e.currentTarget, 'dwt_conv_manager', false);
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_conv_manager', false);
 });
 
 document.getElementById('toggle-readmark').dataset.label = '阅读标记';
 document.getElementById('toggle-readmark').addEventListener('click', (e) => {
-  toggleFeature(e.currentTarget, 'dwt_reading_mark', true);
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_reading_mark', true);
 });
 
 document.getElementById('toggle-digest').dataset.label = '对话摘要';
 document.getElementById('toggle-digest').addEventListener('click', (e) => {
-  toggleFeature(e.currentTarget, 'dwt_chat_digest', false);
+  const btn = e.currentTarget;
+  toggleFeature(btn, 'dwt_chat_digest', false);
 });
 
 // 立即扫描来源

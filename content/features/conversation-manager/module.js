@@ -183,7 +183,7 @@
     toggle.id = 'dwt-conv-toggle';
     toggle.textContent = '🗂';
     toggle.title = '对话管理';
-    toggle.style.cssText = 'position:fixed;left:12px;bottom:56px;z-index:999998;width:32px;height:32px;'
+    toggle.style.cssText = 'position:fixed;left:52px;bottom:56px;z-index:999998;width:32px;height:32px;'
       + 'border-radius:50%;border:1px solid #d0d7de;background:#fff;cursor:pointer;'
       + 'box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:14px;line-height:1;';
     toggle.onclick = () => {
