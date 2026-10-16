@@ -103,6 +103,47 @@ document.getElementById('export-json').addEventListener('click', async () => {
   setStatus('已发送导出 JSON 请求');
 });
 
+// ---------- 工具区块: 功能开关 ----------
+
+// 切换某个功能开关 (读写 chrome.storage.local + 通知 content script 立即生效)
+async function toggleFeature(btn, key, defaultOn) {
+  const r = await chrome.storage.local.get(key);
+  const cur = r[key] === undefined ? defaultOn : r[key] === true;
+  const next = !cur;
+  await chrome.storage.local.set({ [key]: next });
+  const tab = await getActiveDoubaoTab();
+  if (tab) await sendToContent(tab.id, { type: 'TOGGLE_FEATURE', payload: { key, value: next } });
+  btn.classList.toggle('on', next);
+  setStatus((next ? '已开启: ' : '已关闭: ') + btn.dataset.label);
+}
+
+document.getElementById('toggle-source').dataset.label = '来源标注';
+document.getElementById('toggle-source').addEventListener('click', (e) => {
+  toggleFeature(e.currentTarget, 'dwt_source_inspector', true);
+});
+
+document.getElementById('toggle-conv').dataset.label = '对话管理';
+document.getElementById('toggle-conv').addEventListener('click', (e) => {
+  toggleFeature(e.currentTarget, 'dwt_conv_manager', false);
+});
+
+// 立即扫描来源
+document.getElementById('scan-source').addEventListener('click', async () => {
+  const tab = await getActiveDoubaoTab();
+  if (!tab) { setStatus('请先打开 doubao.com 页面'); return; }
+  await sendToContent(tab.id, { type: 'SCAN_SOURCE' });
+  setStatus('已触发来源扫描');
+});
+
+// 初始化按钮的开关态
+(async function initToolButtons() {
+  const r = await chrome.storage.local.get(['dwt_source_inspector', 'dwt_conv_manager']);
+  document.getElementById('toggle-source')
+    .classList.toggle('on', r.dwt_source_inspector !== false);
+  document.getElementById('toggle-conv')
+    .classList.toggle('on', r.dwt_conv_manager === true);
+})();
+
 // 监听 content script 反馈
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'BATCH_EVENT') {

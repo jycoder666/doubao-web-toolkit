@@ -1,1 +1,39 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>Doubao Web Toolkit - 配置</title><link rel="stylesheet" href="options.css"></head><body><div class="wrap"><h1>Doubao Web Toolkit 配置</h1><p class="muted">批量输入模板 + 全局设置</p><h2>批量输入模板</h2><div class="tabs"><button class="tab active" data-tab="json">JSON</button><button class="tab" data-tab="lines">逐行</button></div><textarea id="batch-json" rows="10" placeholder='[{"text":"...", "timeout":180}]'></textarea><textarea id="batch-lines" rows="10" class="hidden" placeholder="请帮我写周报"></textarea><h2>全局设置</h2><div class="row"><label>最小间隔(秒)</label><input type="number" id="min-interval" value="3"></div><div class="row"><label>回复超时(秒)</label><input type="number" id="reply-timeout" value="180"></div><button id="save">保存</button><div id="msg"></div></div><script src="options.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Doubao Web Toolkit - 配置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>Doubao Web Toolkit 配置</h1>
+    <p class="muted">功能开关 + 批量输入模板 + 全局设置</p>
+
+    <h2>功能开关</h2>
+    <div class="row"><label>联网来源标注</label><input type="checkbox" id="feat-source"><span class="muted">在 AI 回复旁显示「来源 N」徽标 + 可信度分级</span></div>
+    <div class="row"><label>输入增强</label><input type="checkbox" id="feat-input"><span class="muted">Ctrl(⌘)+Enter 发送 / 记忆上次使用的模型</span></div>
+    <div class="row"><label>对话管理</label><input type="checkbox" id="feat-conv"><span class="muted">左侧会话列表批量勾选 + 删除（默认关闭）</span></div>
+    <div class="row"><label>调试面板</label><input type="checkbox" id="feat-debug"><span class="muted">右下角「⚙ DWT」按钮 + 选择器表</span></div>
+
+    <h2>批量输入模板</h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="json">JSON</button>
+      <button class="tab" data-tab="lines">逐行</button>
+    </div>
+    <textarea id="batch-json" rows="10" placeholder='[{"text":"...", "timeout":180}]'></textarea>
+    <textarea id="batch-lines" rows="10" class="hidden" placeholder="请帮我写周报"></textarea>
+
+    <h2>全局设置</h2>
+    <div class="row"><label>最小间隔(秒)</label><input type="number" id="min-interval" value="3"></div>
+    <div class="row"><label>回复超时(秒)</label><input type="number" id="reply-timeout" value="180"></div>
+
+    <button id="save">保存</button>
+    <div id="msg"></div>
+  </div>
+  <script src="options.js"></script>
+</body>
+
+</html>

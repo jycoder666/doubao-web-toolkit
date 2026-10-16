@@ -6,4 +6,6 @@ button { padding: 6px 10px; border: 1px solid #d0d7de; border-radius: 6px; backg
 button:hover { background: #f6f8fa; }
 button.primary { background: #2d72de; color: #fff; border-color: #2d72de; }
 button.primary:hover { background: #1f5ec4; }
+button.on { background: #e6f4ea; color: #1a7f37; border-color: #a8d5b5; font-weight: 600; }
+button.on::after { content: " ✓"; }
 .muted { color: #666; font-size: 11px; min-height: 14px; }

@@ -41,6 +41,32 @@
       sendResponse({ ok: true });
       return true;
     }
+    // 功能开关切换: 立即通知对应模块生效 (无需刷新页面)
+    if (msg.type === 'TOGGLE_FEATURE') {
+      const { key, value } = msg.payload || {};
+      applyFeatureToggle(key, value);
+      sendResponse({ ok: true });
+      return true;
+    }
+    // 立即扫描联网来源
+    if (msg.type === 'SCAN_SOURCE') {
+      window.dwt?.sourceInspectorModule?.annotate?.();
+      sendResponse({ ok: true });
+      return true;
+    }
     return true;
   });
+
+  // 根据 storage key 分发到对应模块
+  function applyFeatureToggle(key, value) {
+    const map = {
+      dwt_source_inspector: () => window.dwt?.sourceInspectorModule?.setEnabled?.(value),
+      dwt_enter_swap: () => window.dwt?.inputEnhanceModule?.setSwap?.(value),
+      dwt_conv_manager: () => window.dwt?.convManagerModule?.setEnabled?.(value),
+      dwt_debug_panel: () => {
+        // 调试面板由 TOGGLE_DEBUG_PANEL 控制, 这里只记录状态
+      },
+    };
+    try { map[key]?.(); } catch (e) { console.warn(LOG, 'applyFeatureToggle failed', key, e); }
+  }
 })();

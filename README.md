@@ -13,7 +13,9 @@ Chrome/Edge Manifest V3 浏览器扩展，专门服务 doubao.com / dola.com 网
 | 提示词快捷条 | ✅ | 右下角快捷按钮栏，点击写入 ProseMirror |
 | 主题切换（深色/浅色） | ✅ | 注入 dark CSS，storage 持久化 |
 | 自动滚动 + 悬浮⬇按钮 | ✅ | MutationObserver 监听新回复，用户接近底部时自动滚 |
-| 联网来源标注 | 🚧 占位 | 豆包回复的来源 DOM 结构未确认，待观察后实现 |
+| 联网来源标注 | ✅ | 扫描 AI 回复外链 → 解包 `link.wtturl.cn` 跳转 → 域名可信度分级（高/中/低）→ 回复旁挂「🔗 来源 N」徽标，点击展开来源面板 |
+| 输入增强（Enter 换行） | ✅ | Enter 换行 / Ctrl(⌘)+Enter 发送；记录最近使用的模型名（`dwt_last_model`） |
+| 对话管理（批量清理） | ✅ | 左侧会话列表注入复选框 → 全选/反选 → 批量删除（模拟点击豆包自带菜单，删除前二次确认，默认关闭） |
 
 功能总览清单（225 条仓库、合规评级、优先级、impl 勾选）：
 [豆包插件功能总览_2026-10-15.md](https://github.com/jycoder666/doubao-web-toolkit#)
@@ -28,7 +30,9 @@ Chrome/Edge Manifest V3 浏览器扩展，专门服务 doubao.com / dola.com 网
    - 右下角「提示词」快捷条
    - 左侧「📍 导航」条
    - 左下角「⬇」悬浮按钮
-5. 扩展图标点开 = popup（批量输入开始/停止/放行 + 导出 Markdown/JSON）
+   - AI 回复旁的「🔗 来源 N」徽标（联网来源标注）
+   - 开启「对话管理」后，左下角出现「🗂」入口按钮
+5. 扩展图标点开 = popup（批量输入开始/停止/放行 + 导出 Markdown/JSON + 来源标注/对话管理开关）
 6. 扩展图标右键 → 选项 = 配置页（功能开关 + 批量输入模板）
 
 ## 批量输入（用户原创）
@@ -62,7 +66,11 @@ Chrome/Edge Manifest V3 浏览器扩展，专门服务 doubao.com / dola.com 网
 | 输入框 | `.ProseMirror` | tiptap contenteditable 编辑器 |
 | 发送按钮 | 优先 `bg-g-send-msg-btn-bg`，兜底特征匹配 | 输入框空时发送按钮不存在，用 `waitForSend()` 200ms 轮询 |
 | 回复中标识 | `[data-streaming="true"]` | 豆包用 data-streaming 属性，不用 thinking/streaming class |
+| 用户消息 | `[class*="bg-g-send-msg-bubble-bg"]` | |
+| AI 回复 | `[class*="conversation-message-content-padding-right"]` | 来源标注以该容器为根扫描外链 |
 | 验证码 | `[class*="captcha"], [class*="verify"]...` | 多 selector 兜底 |
+| 侧栏会话项操作按钮 | `[data-sidebar-item-actions="true"]` | **hover-only**（默认 opacity:0），需先派发 `mouseover` 触发渲染 |
+| 外链跳转包装 | `link.wtturl.cn/?target=<urlencoded>` | 豆包把所有 AI 回复外链包了一层跳转，取真实域名须解包 `target` 参数 |
 
 所有选择器在**调试面板**里可查看/编辑/保存到 storage。
 

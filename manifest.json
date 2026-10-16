@@ -48,6 +48,8 @@
         "content/features/navigator/module.js",
         "content/features/enhance/module.js",
         "content/features/source-inspector/module.js",
+        "content/features/input-enhance/module.js",
+        "content/features/conversation-manager/module.js",
         "content/features/batch-input/module.js",
         "content/content-loader.js"
       ]

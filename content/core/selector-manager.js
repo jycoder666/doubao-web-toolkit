@@ -7,6 +7,15 @@
     // 输入框 —— ProseMirror (tiptap 编辑器)
     input: '.ProseMirror',
 
+    // AI 回复内容容器 (用于导出 / 来源标注)
+    aiContent: '[class*="conversation-message-content-padding-right"]',
+
+    // 用户消息气泡
+    userBubble: '[class*="bg-g-send-msg-bubble-bg"]',
+
+    // 左侧会话列表容器 (用于对话管理)
+    conversationList: '[class*="conversation-list"], [class*="session-list"]',
+
     // 发送按钮 —— 特征匹配: disabled=false + has svg + top>550 + 靠右
     sendMatch: (btn) => {
       const r = btn.getBoundingClientRect();
