@@ -1,141 +1,163 @@
 ---
 name: glass-dwt-inject-accept
 description: >-
-  Glass Doubao DWT inject/accept playbook: MCP ghost tabs, Cursor main.js patch
-  without MCP, ESM require pitfalls, BOOT_JS newline syntax, Chromium 6-conn
-  critical-inline, Origin/UA verify beacon. Use when injecting live-boot on
-  Doubao Glass, debugging empty browser_tabs, patching Cursor main/preload,
-  serving 5179, or accepting gear/promptBar/navigator uiReady.
+  Operator playbook: inject an extension/project into a Glass host domain so
+  refresh shows the plugin. Preflight (serve 5179, Cursor patch markers,
+  restart gate via process StartTime vs patch mtime, host allowlist, manifest
+  load chain), then verify inject log + uiReady. Use when user says inject X
+  into domain Y and refresh Glass, or when debugging DWT Glass inject/accept.
 ---
 
 # Glass DWT Inject / Accept
 
-Hard-won lessons for `doubao-web-toolkit` on Cursor Glass. Companion hard gate:
-`D:\other\docs\skills\cursor-builtin-browser-extension\SKILL.md` and
-`.cursor/rules/glass-tab-reuse.mdc`.
-
 **Announce at start:** 正在使用 glass-dwt-inject-accept 技能。
 
----
-
-## When to use
-
-- Glass 豆包页缺 ⚙ / 提示词条 / 导航，或 `uiReady` 假
-- Settings 显示 Connected to Browser Tab，但 MCP `browser_tabs` 为空
-- 改 `dev/_patch_cursor_dwt_inject.py` / `live-boot.js` / `serve.py` 后验收
-- Inject 日志静默、`Script failed`、`Invalid or unexpected token`
-- 5179 被打满、critical 模块只加载一半
+Companion hard gate: `D:\other\docs\skills\cursor-builtin-browser-extension\SKILL.md` +
+`.cursor/rules/glass-tab-reuse.mdc`.
 
 ---
 
-## Breakthroughs（必须内化）
+## Invocation pattern
 
-### 1. MCP ghost tabs
+When user says (any close phrasing):
 
-Settings「Connected to Browser Tab」**不等于** MCP `browser_tabs` list。
-Glass 里肉眼可见的豆包页可以在 MCP 侧完全空白。
+> 将某浏览器插件注入哪个域名，刷新内置浏览器就能看到
 
-- Agent **不得**因此打开 `doubao.com`（glass-tab-reuse 硬闸）
-- MCP 空时：只改 inject / serve / 补丁 / 文档；等用户已有标签变为 MCP 可见
-- **不要**催用户「去 Accept / 点连接」来填满 MCP list——那解决不了 ghost
+→ run this skill **end-to-end**: preflight → restart gate → wire/serve → verify → report pass/fail.
 
-### 2. Inject without MCP
+Same for: inject [extension/project] into [domain], refresh Glass to see it.
 
-主路径：`python dev/_patch_cursor_dwt_inject.py` 补丁 Cursor `main.js` / `preload-browser.js`。
+---
 
-- 补丁扫 `getAllWebContents()`，即使 MCP 盲也能命中豆包 WC
-- 钩子：`did-finish-load` / `focus` / `did-navigate` / `did-navigate-in-page` + eager VP sweep
-- 日志：`dev/.dwt-inject.log` 与 `%TEMP%\dwt-inject.log`
-- **补丁只在完整重启 Cursor 后生效**（Reload Window 不够）
+## Preflight checks (report pass/fail)
 
-### 3. v3.4 → v3.5：ESM `main.js` 静默 `require()` 失败
+Do all six. Report each as ✅/❌ before claiming progress.
 
-新版 Cursor `main.js` 为 ESM：补丁里 `require("fs")` / `require("os")` 会静默失败 → **零 inject 日志**。
+### 1. Serve 5179 + live-boot 200
 
-- 用 ESM-safe 路径（`process.env.TEMP` 等）与合法 `import`/`fs` 注入点
-- Eager VP sweep + **every-tick logging**（sweep 有无 match 都要落盘）
-- 禁止在 ESM main 补丁里依赖裸 `require`
+```text
+GET http://127.0.0.1:5179/dev/live-boot.js → 200
+Header: Access-Control-Allow-Private-Network: true
+```
 
-### 4. v3.6 BOOT_JS：外层双引号里的 `\n`
+If down: `python dev/serve.py` (repo root). Port half-dead → kill occupant, restart serve.
 
-`BOOT_JS` 嵌在 outer double-quoted string 时，源码里的 `\n` 会变成真实换行 →
-`Invalid or unexpected token` / Script failed；sweep `match=1` 但 stub 不跑。
+### 2. Cursor inject patch on disk
 
-- **Fix:** 换行用 `String.fromCharCode(10)`，外层引号内禁止字面 `\n` 转义
-- 标记：`ver:'v36'` + `String.fromCharCode(10)+'//# sourceURL='`
+Script: `dev/_patch_cursor_dwt_inject.py`  
+Targets:
 
-### 5. Critical boot / 6-conn limit
+- `D:\cursor\resources\app\out\main.js`
+- `...\vs\platform\browserView\electron-main\preload-browser.js`
 
-Chromium **每 host 6 连接**到 `127.0.0.1:5179`。Inject 风暴 + 串行 critical fetch
-会占满连接 → gear/nav 拉挂，只剩 promptBar+domObserver 等幸存者。
+Markers (current): `ver:'v36'` / `v36-sweep` / `injectDwtLiveBootForState` / `String.fromCharCode(10)`.
 
-- **Fix:** `serve.py` `_critical_bundle_bytes()` 把 critical 内联进 `/dev/live-boot.js`（一次 fetch）
-- `chrome-mock` **推迟** bus poll，把预算留给 critical UI
-- incomplete-retry：半截 boot / 缺 ⚙·提示词·导航时再补
-- Beacon 证明：`uiReady` + gear / promptBar / navigator
+❌ missing → run patch script, then **restart gate** (check 3).
 
-### 6. Verify beacon（MCP ghost 时优先）
+### 3. Restart needed? (mandatory)
 
-MCP 空时不要靠截图验收。优先：
+Compare **Cursor process StartTime** vs **main.js + preload mtime** (and whether allowlist in patch script changed + was re-applied).
+
+| Condition | Action |
+| --- | --- |
+| Cursor StartTime **&lt;** patch file mtime (main.js and/or preload) | **MUST** fully quit + reopen Cursor. Reload Window is **not** enough. Tell user **one** clear action. |
+| Host allowlist changed in `_patch_cursor_dwt_inject.py` and re-applied | Restart required |
+| Only `dev/live-boot.js` / content modules / `serve.py` changed | **NO** Cursor restart — refresh existing Glass tab (or wait inject sweep) |
+| Patch present, StartTime **≥** mtime, allowlist unchanged | No restart |
+
+**Never claim done** if patch files changed without completing this check.
+
+PowerShell sketch:
+
+```powershell
+$p = Get-Process Cursor -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object -First 1
+$main = Get-Item 'D:\cursor\resources\app\out\main.js'
+# Restart if $p.StartTime -lt $main.LastWriteTime (same for preload)
+```
+
+### 4. Domain in host allowlist
+
+Patch matches hosts containing `doubao` / `dola` (see `HOST_OK` in patch script).
+
+- Domain already covered → OK  
+- **New domain** → update allowlist in `_patch_cursor_dwt_inject.py` → re-apply → **restart Cursor**
+
+### 5. Modules on same load chain as unpacked extension
+
+Wire new modules into:
+
+1. `manifest.json` `content_scripts` order (unpacked Chrome path)  
+2. `live-boot` critical / full bundles (`serve.py` critical-inline + `live-boot-full`)
+
+**No** separate Glass-only UI. Glass must load the **same** scripts the unpacked extension uses.
+
+### 6. Hard gate (tabs)
+
+- Reuse existing **same-URL** Glass tab; never Agent-`new` / `open_resource` / navigate duplicate target chat URLs  
+- MCP `browser_tabs` empty → stop page ops; use `dev/.dwt-inject.log` + `GET /dev/bridge/verify`  
+- No external Chrome
+
+---
+
+## Workflow steps
+
+```text
+Task Progress:
+- [ ] Wire module into manifest + live-boot critical/full (same chain)
+- [ ] Preflight 1–6 reported
+- [ ] Restart gate decided; if needed → tell user ONE action, wait
+- [ ] User refreshes existing Glass tab (or inject sweep hits)
+- [ ] Inject log: ok:true + ver marker (e.g. v36)
+- [ ] Verify: uiReady + domain UI (gear / promptBar / navigator or equivalent)
+- [ ] Report pass/fail + what changed vs restart yes/no
+```
+
+1. **Wire** → content module + manifest + live-boot load list  
+2. **Ensure serve** → 5179 + live-boot 200  
+3. **Restart gate** → if patch/allowlist touched and StartTime stale → user must fully quit+reopen Cursor (**one** sentence)  
+4. **After load** → check inject log `ok:true`; beacon `uiReady` + UI flags  
+5. **MCP has tab** → lock that tab only → reload / CDP `live-boot` if needed  
+6. **MCP empty** → no nag “Accept”; rely on patch + log + verify beacon  
+
+Verify beacon:
 
 ```text
 GET http://127.0.0.1:5179/dev/bridge/verify
 ```
 
-- 只信 **Origin/UA 过滤后**的真实 Glass `verify_post`（`doubao.com/chat`）
-- UI flags：`gear` / `promptBar` / `navigator` / `uiReady`
-- **jsdom probe / `reason: jsdom-critical-probe` 不得计为验收**
-- 需要清空：`POST /dev/bridge/verify` body `{"reset":true}`
-
-### 7. Ops checklist
-
-1. `python dev/serve.py` → `5179` 常开（CORS + `Access-Control-Allow-Private-Network`）
-2. `python dev/_patch_cursor_dwt_inject.py` → **完整重启 Cursor**
-3. 用户点回**已有**豆包 chat（或 F5）；Agent 不代开
-4. 查 `.dwt-inject.log` 有 `ok:true` / `v36`
-5. 查 verify beacon `uiReady=true`
+Trust only Origin/UA-filtered real host posts. **jsdom probe / `reason: jsdom-critical-probe` ≠ accept.** Reset: `POST` `{"reset":true}`.
 
 ---
 
-## Workflow（Agent）
+## Restart-rule summary (memorize)
 
-```text
-Task Progress:
-- [ ] serve 5179 200 + PNA
-- [ ] main 含 v36 BOOT + fromCharCode(10)；否则补丁 + 请用户重启
-- [ ] browser_tabs list（可空）
-- [ ] MCP 有豆包 → lock → reload/CDP；MCP 空 → 不 nag、不 new，靠补丁+beacon
-- [ ] GET /dev/bridge/verify → uiReady + gear/promptBar/navigator
-- [ ] 失败只修 inject/serve/补丁；禁止开豆包 / 外开 Chrome
-```
+- **Restart Cursor** when: `main.js` / preload patch re-applied, or host allowlist changed+applied, and process StartTime is older than those files.  
+- **No restart** when: only serve / `live-boot.js` / feature modules changed → refresh Glass (or wait sweep).
 
-### MCP 有 tab
+---
 
-1. `browser_tabs` list → 同 URL 重复则关多余只留一个  
-2. `browser_lock` → `Page.reload` 或 CDP fetch+eval `http://127.0.0.1:5179/dev/live-boot.js`  
-3. 交叉验证 CDP DOM + verify beacon  
+## Breakthroughs (compact)
 
-### MCP 空（ghost）
-
-1. **停手页面操作**；硬闸：禁止 new / open_resource / navigate 豆包  
-2. 确认补丁版本 + 用户已重启 + serve 存活  
-3. 读 inject log + Origin/UA-filtered verify  
-4. 需要交互时等用户侧标签变为 MCP 可见  
+| Topic | Rule |
+| --- | --- |
+| MCP ghost | Settings “Connected” ≠ `browser_tabs` list; don’t open target URL; don’t nag Accept |
+| Inject without MCP | Patch main/preload sweeps `getAllWebContents()`; logs: `dev/.dwt-inject.log` + `%TEMP%\dwt-inject.log` |
+| ESM main | No bare `require()` in patch — silent zero logs |
+| BOOT_JS | Outer double-quoted `\n` → real newline / Script failed; use `String.fromCharCode(10)` |
+| 6-conn | Critical modules inlined into one `/dev/live-boot.js` fetch; defer bus poll |
 
 ---
 
 ## Anti-patterns
 
-| 禁止 | 原因 |
+| Don’t | Why |
 | --- | --- |
-| MCP 空时催用户 Accept / 重连 Browser Tab | Ghost ≠ 未连接；浪费回合 |
-| Agent 打开 / 导航 doubao.com | 硬闸；Settings 已有页仍可能 MCP 盲 |
-| 外开 Chrome / `--load-extension` 冒充 Glass 验收 | 链路分立 |
-| ESM `main.js` 补丁用裸 `require()` | 静默失败，零日志 |
-| BOOT_JS 外层双引号写 `\n` | Script failed，有 match 无执行 |
-| critical 多段串行 fetch 打 5179 | 6-conn 饿死 gear/nav |
-| 把 jsdom probe 当 uiReady 验收 | 假阳性 |
-| 画临时 `#dwt-nav` 冒充插件 | 验收作废 |
+| Nag “Accept” / reconnect when MCP empty | Ghost ≠ disconnected |
+| Open duplicate target chat URLs | Tab hard gate |
+| Claim done without restart check after patch files change | Stale process = old inject |
+| Separate Glass-only DOM instead of manifest chain | Fake accept |
+| External Chrome / `--load-extension` as Glass proof | Wrong pipe |
+| Count jsdom probe as uiReady | False positive |
 
 ---
 
@@ -143,16 +165,15 @@ Task Progress:
 
 | Path | Role |
 | --- | --- |
-| `dev/serve.py` | 5179；critical-inline；verify bridge |
-| `dev/live-boot.js` | 页面入口；uiReady beacon |
-| `dev/chrome-mock.js` | chrome.* mock；defer bus poll |
-| `dev/_patch_cursor_dwt_inject.py` | Cursor main/preload v36 补丁 |
-| `dev/.dwt-inject.log` | 主进程 inject 证据（勿提交） |
-| `PROJECT_STATUS.md` | 最近验收快照 |
+| `dev/serve.py` | 5179; critical-inline; verify bridge |
+| `dev/live-boot.js` | Page entry; uiReady beacon |
+| `dev/_patch_cursor_dwt_inject.py` | Cursor main/preload patch + host allowlist |
+| `dev/.dwt-inject.log` | Inject evidence (do not commit) |
+| `manifest.json` | Canonical content_scripts order |
 
 ---
 
 ## Related
 
-- Hard gate / 通用 Glass 扩展嵌套：`cursor-builtin-browser-extension`（`D:\other\docs\skills\...`）
-- 仓库硬闸规则：`.cursor/rules/glass-tab-reuse.mdc`
+- Hard gate / generic Glass embed: `D:\other\docs\skills\cursor-builtin-browser-extension\SKILL.md`
+- Repo rule: `.cursor/rules/glass-tab-reuse.mdc`
