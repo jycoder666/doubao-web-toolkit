@@ -25,6 +25,7 @@ When inject runs (v3.6):
 """
 from __future__ import annotations
 
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -42,42 +43,79 @@ INJECT_LOG_TEMP_ESM = (
     '(process.env.TEMP||process.env.TMP||process.env.TMPDIR||".")+"\\\\dwt-inject.log"'
 )
 
-HOOK_OLD = (
-    'a.on("did-finish-load",()=>{this.injectColorSchemePreferenceForState(u),'
-    "u.onDidFinishLoad.fire({viewId:r})})"
-)
-HOOK_NEW = (
-    'a.on("did-finish-load",()=>{this.injectColorSchemePreferenceForState(u),'
-    "this.injectDwtLiveBootForState(u),u.onDidFinishLoad.fire({viewId:r})})"
-)
+# Cursor rebuilds minify aliases (u→d, Pj→$fe, VP→S2, …). Try each (old, new) pair.
+HOOK_VARIANTS = [
+    (
+        'a.on("did-finish-load",()=>{this.injectColorSchemePreferenceForState(d),'
+        "d.onDidFinishLoad.fire({viewId:r})})",
+        'a.on("did-finish-load",()=>{this.injectColorSchemePreferenceForState(d),'
+        "this.injectDwtLiveBootForState(d),d.onDidFinishLoad.fire({viewId:r})})",
+    ),
+    (
+        'a.on("did-finish-load",()=>{this.injectColorSchemePreferenceForState(u),'
+        "u.onDidFinishLoad.fire({viewId:r})})",
+        'a.on("did-finish-load",()=>{this.injectColorSchemePreferenceForState(u),'
+        "this.injectDwtLiveBootForState(u),u.onDidFinishLoad.fire({viewId:r})})",
+    ),
+]
 
-FOCUS_HOOK_OLD = (
-    'a.on("focus",()=>{this.logService.trace(`[BrowserViewMainService] webContents focused (window ${e})`),'
-    "u.onDidFocus.fire({viewId:r})})"
-)
-FOCUS_HOOK_NEW = (
-    'a.on("focus",()=>{this.logService.trace(`[BrowserViewMainService] webContents focused (window ${e})`),'
-    "this.injectDwtLiveBootForState(u),u.onDidFocus.fire({viewId:r})})"
-)
+FOCUS_HOOK_VARIANTS = [
+    (
+        'a.on("focus",()=>{this.logService.trace(`[BrowserViewMainService] webContents focused (window ${e})`),'
+        "d.onDidFocus.fire({viewId:r})})",
+        'a.on("focus",()=>{this.logService.trace(`[BrowserViewMainService] webContents focused (window ${e})`),'
+        "this.injectDwtLiveBootForState(d),d.onDidFocus.fire({viewId:r})})",
+    ),
+    (
+        'a.on("focus",()=>{this.logService.trace(`[BrowserViewMainService] webContents focused (window ${e})`),'
+        "u.onDidFocus.fire({viewId:r})})",
+        'a.on("focus",()=>{this.logService.trace(`[BrowserViewMainService] webContents focused (window ${e})`),'
+        "this.injectDwtLiveBootForState(u),u.onDidFocus.fire({viewId:r})})",
+    ),
+]
 
-NAV_HOOK_OLD = (
-    'a.on("did-navigate",(h,_)=>{u.consoleLogs=[],u.networkRequests=[],'
-    "u.onDidNavigate.fire({url:_,isMainFrame:!0,viewId:r})})"
-)
-NAV_HOOK_NEW = (
-    'a.on("did-navigate",(h,_)=>{u.consoleLogs=[],u.networkRequests=[],'
-    "this.injectDwtLiveBootForState(u),"
-    "u.onDidNavigate.fire({url:_,isMainFrame:!0,viewId:r})})"
-)
+NAV_HOOK_VARIANTS = [
+    (
+        'a.on("did-navigate",(f,v)=>{d.consoleLogs=[],d.networkRequests=[],'
+        "d.onDidNavigate.fire({url:v,isMainFrame:!0,viewId:r})})",
+        'a.on("did-navigate",(f,v)=>{d.consoleLogs=[],d.networkRequests=[],'
+        "this.injectDwtLiveBootForState(d),"
+        "d.onDidNavigate.fire({url:v,isMainFrame:!0,viewId:r})})",
+    ),
+    (
+        'a.on("did-navigate",(h,_)=>{u.consoleLogs=[],u.networkRequests=[],'
+        "u.onDidNavigate.fire({url:_,isMainFrame:!0,viewId:r})})",
+        'a.on("did-navigate",(h,_)=>{u.consoleLogs=[],u.networkRequests=[],'
+        "this.injectDwtLiveBootForState(u),"
+        "u.onDidNavigate.fire({url:_,isMainFrame:!0,viewId:r})})",
+    ),
+]
 
-NAV_INPAGE_OLD = (
-    'a.on("did-navigate-in-page",(h,_,v)=>{'
-    "u.onDidNavigateInPage.fire({url:_,isMainFrame:v,viewId:r})})"
-)
-NAV_INPAGE_NEW = (
-    'a.on("did-navigate-in-page",(h,_,v)=>{'
-    "this.injectDwtLiveBootForState(u),"
-    "u.onDidNavigateInPage.fire({url:_,isMainFrame:v,viewId:r})})"
+NAV_INPAGE_VARIANTS = [
+    (
+        'a.on("did-navigate-in-page",(f,v,T)=>{'
+        "d.onDidNavigateInPage.fire({url:v,isMainFrame:T,viewId:r})})",
+        'a.on("did-navigate-in-page",(f,v,T)=>{'
+        "this.injectDwtLiveBootForState(d),"
+        "d.onDidNavigateInPage.fire({url:v,isMainFrame:T,viewId:r})})",
+    ),
+    (
+        'a.on("did-navigate-in-page",(h,_,v)=>{'
+        "u.onDidNavigateInPage.fire({url:_,isMainFrame:v,viewId:r})})",
+        'a.on("did-navigate-in-page",(h,_,v)=>{'
+        "this.injectDwtLiveBootForState(u),"
+        "u.onDidNavigateInPage.fire({url:_,isMainFrame:v,viewId:r})})",
+    ),
+]
+
+# Legacy single-name constants kept for grep/docs; prefer *_VARIANTS above.
+HOOK_OLD, HOOK_NEW = HOOK_VARIANTS[-1]
+FOCUS_HOOK_OLD, FOCUS_HOOK_NEW = FOCUS_HOOK_VARIANTS[-1]
+NAV_HOOK_OLD, NAV_HOOK_NEW = NAV_HOOK_VARIANTS[-1]
+NAV_INPAGE_OLD, NAV_INPAGE_NEW = NAV_INPAGE_VARIANTS[-1]
+
+_BV_ELECTRON_IMPORT_RE = re.compile(
+    r'import\{([^}]*\bWebContentsView\b[^}]*)\}from"electron";?'
 )
 
 PRELOAD_LISTENERS_OLD = (
@@ -104,18 +142,45 @@ BOOT_JS = (
     "function inc(){try{"
     "if(!document.getElementById('dwt-panel-toggle'))return!0;"
     "if(!document.getElementById('dwt-prompt-bar'))return!0;"
-    "if(!document.getElementById('dwt-nav'))return!0;"
+    "var navEl=document.getElementById('dwt-nav');"
+    "var navMod=window.dwt&&window.dwt.navigatorModule;"
+    "var gutterOk=navMod&&typeof navMod.mode==='function'&&navMod.mode()==='gutter-css'"
+    "&&document.documentElement.classList.contains('dwt-gutter-ok')"
+    "&&!!document.querySelector('aside[class*=\"gutter\"]');"
+    "if(!navEl&&!gutterOk)return!0;"
     "var d=window.dwt;if(!d)return!0;"
     "var k=Object.keys(d),n=0,i=0;for(;i<k.length;i++)if(k[i]!=='domObserver')n++;"
     "return n<1}catch(e){return!0}}"
+    "function staleNav(){try{"
+    "var m=window.dwt&&window.dwt.navigatorModule;"
+    "return!(m&&typeof m.rev==='number'&&m.rev>=10)"
+    "}catch(e){return!0}}"
+    "function visProbe(el){try{"
+    "if(!el)return{exists:!1,offsetParent:!1,display:\"\",w:0,h:0,top:0,left:0};"
+    "var cs=window.getComputedStyle?getComputedStyle(el):null;"
+    "var r=el.getBoundingClientRect?el.getBoundingClientRect():{width:0,height:0,top:0,left:0};"
+    "return{exists:!0,offsetParent:!!el.offsetParent,display:cs?String(cs.display||\"\"):\"\","
+    "w:Math.round(r.width||0),h:Math.round(r.height||0),top:Math.round(r.top||0),left:Math.round(r.left||0)}"
+    "}catch(e){return{exists:!!el,offsetParent:!1,display:\"err\",w:0,h:0,top:0,left:0}}}"
     "function postStub(reason){try{"
+    "var navEl=document.getElementById('dwt-nav');"
+    "var gutEl=document.querySelector('aside[class*=\"gutter\"], aside.absolute.inset-y-0.left-12');"
+    "var navMod=window.dwt&&window.dwt.navigatorModule;"
+    "var mode=\"\";try{mode=navMod&&typeof navMod.mode==='function'?String(navMod.mode()||\"\"):\"\"}catch(e0){}"
     "var b=JSON.stringify({"
-    "href:String(location.href||''),"
-    "reason:reason||'boot-stub',"
-    "ver:'v36',"
+    "href:String(location.href||\"\"),"
+    "reason:reason||\"boot-stub\","
+    "ver:\"v41\","
     "toggle:!!document.getElementById('dwt-panel-toggle'),"
     "promptBar:!!document.getElementById('dwt-prompt-bar'),"
-    "nav:!!document.getElementById('dwt-nav'),"
+    "nav:!!navEl,"
+    "navRev:(navMod&&typeof navMod.rev==='number'?navMod.rev:0),"
+    "navMode:mode,"
+    "gutterMode:mode==='gutter-css',"
+    "nativeGutter:!!gutEl,"
+    "navVis:visProbe(navEl),"
+    "gutterVis:visProbe(gutEl),"
+    "autoScrollSweep:!1,"
     "liveBoot:!!window.__dwtLiveBoot,"
     "glassBoot:!!window.__dwtGlassBoot,"
     "dwt:!!window.dwt,t:Date.now()"
@@ -123,8 +188,11 @@ BOOT_JS = (
     "fetch('http://127.0.0.1:5179/dev/bridge/verify',{"
     "method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},"
     "body:b,mode:'cors',keepalive:!0}).catch(function(){});"
+    "fetch('http://127.0.0.1:5181/dev/bridge/verify',{"
+    "method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},"
+    "body:b,mode:'cors',keepalive:!0}).catch(function(){});"
     "try{if(navigator.sendBeacon)navigator.sendBeacon("
-    "'http://127.0.0.1:5179/dev/bridge/verify',"
+    "'http://127.0.0.1:5181/dev/bridge/verify',"
     "new Blob([b],{type:'text/plain;charset=UTF-8'}))}catch(e2){}"
     "}catch(e){}}"
     "var attempt=0;"
@@ -146,8 +214,8 @@ BOOT_JS = (
     "if(window.__dwtBootStubWatch)return;"
     "window.__dwtBootStubWatch=1;"
     "setInterval(function(){"
-    "postStub(inc()?'boot-stub-watch-inc':'boot-stub-watch-ok');"
-    "if(inc()){"
+    "postStub(inc()||staleNav()?'boot-stub-watch-inc':'boot-stub-watch-ok');"
+    "if(inc()||staleNav()){"
     "if(window.__dwtBootLoading)return;"
     "try{delete window.__dwtLiveBoot}catch(e){window.__dwtLiveBoot=!1}"
     "window.__dwtVerifyScheduled=!1;"
@@ -155,7 +223,15 @@ BOOT_JS = (
     "}"
     "},4000)}"
     "ensureWatch();"
-    "if(window.__dwtLiveBoot&&!inc()){postStub('boot-stub-complete');return}"
+    "if(window.__dwtLiveBoot&&!inc()&&!staleNav()){"
+    "postStub('boot-stub-complete');"
+    # Force one live-boot re-pull so accept can capture navVis + stable probe.
+    "if(!window.__dwtNavVisForcedAt||Date.now()-window.__dwtNavVisForcedAt>15000){"
+    "window.__dwtNavVisForcedAt=Date.now();"
+    "try{delete window.__dwtLiveBoot}catch(e3){window.__dwtLiveBoot=!1}"
+    "window.__dwtVerifyScheduled=!1;attempt=0;go()"
+    "}"
+    "return}"
     "if(window.__dwtBootLoading){postStub('boot-stub-inflight');return}"
     "window.__dwtGlassBoot=!0;"
     "try{delete window.__dwtLiveBoot}catch(e){window.__dwtLiveBoot=!1}"
@@ -167,9 +243,18 @@ BOOT_JS = (
 BROKEN_BOOT_MARK = "c+'\\n//# sourceURL='+u"
 FIXED_BOOT_MARK = "String.fromCharCode(10)+'//# sourceURL='"
 V36_BOOT_MARK = "ver:'v36'"
+V37_BOOT_MARK = "ver:'v37'"
+V38_BOOT_MARK = "ver:'v38'"
+V39_BOOT_MARK = "ver:'v39'"
+STALE_NAV_MARK = "staleNav()"
+STALE_NAV_REV6_MARK = "m.rev>=6"
+STALE_NAV_REV7_MARK = "m.rev>=7"
+STALE_NAV_REV9_MARK = "m.rev>=9"
+STALE_NAV_REV10_MARK = "m.rev>=10"
 
 METHOD_ANCHOR = "injectColorSchemePreferenceForState(e){"
 
+# Legacy fallback (pre-reinstall minify names). Discovery prefers live main.js import.
 ELECTRON_IMPORT = (
     'import{app as Pj,BrowserWindow as hFe,WebContentsView as fFe,shell as GP,'
     'dialog as gFe,session as Aj,webContents as VP}from"electron";'
@@ -205,106 +290,153 @@ ERR_DETAIL = (
     "}}catch{return{msg:String(e).slice(0,200),stack:null}}}"
 )
 
-# Eager global sweep — runs at module load; does NOT wait for BrowserView hooks.
-GLOBAL_BOOTSTRAP = (
-    f"{FS_IMPORT}"
-    ";(()=>{try{"
-    f"if(globalThis.{V36_MARK})return;globalThis.{V36_MARK}=1;"
-    f"globalThis.{V35_MARK}=1;"
-    f"{HOST_OK}"
-    f"{LOG_HELPER}"
-    f"{ERR_DETAIL};"
-    f'const __dwtBoot="{BOOT_JS}";'
-    "const __dwtInj=(wc,src)=>{try{"
-    "if(!wc||wc.isDestroyed())return;"
-    "const n=String(wc.getURL()||\"\");"
-    "if(!__dwtHostOk(n))return;"
-    "__dwtWlog({t:Date.now(),src:String(src||\"\"),url:n,id:wc.id,ok:!1,"
-    "err:\"attempt\",ver:\"v36\",bootLen:__dwtBoot.length});"
-    "wc.executeJavaScript(__dwtBoot)"
-    ".then(()=>__dwtWlog({t:Date.now(),src:String(src||\"\"),url:n,id:wc.id,"
-    "ok:!0,err:null,ver:\"v36\"}))"
-    ".catch(e=>{const d=__dwtErr(e);__dwtWlog({t:Date.now(),src:String(src||\"\"),"
-    "url:n,id:wc.id,ok:!1,err:d.msg,stack:d.stack,ver:\"v36\","
-    "bootLen:__dwtBoot.length})})"
-    "}catch(e){const d=__dwtErr(e);__dwtWlog({t:Date.now(),"
-    "src:String(src||\"\")+\"-throw\",err:d.msg,stack:d.stack,ver:\"v36\"})}};"
-    "const __dwtTick=()=>{try{"
-    "const list=VP.getAllWebContents();"
-    "const urls=[];let match=0;"
-    "for(const wc of list){"
-    "if(wc.isDestroyed())continue;"
-    "let u=\"\";try{u=String(wc.getURL()||\"\")}catch{}"
-    "if(u)urls.push({id:wc.id,url:u.slice(0,180)});"
-    "if(__dwtHostOk(u)){match++;__dwtInj(wc,\"v36-sweep\")}"
-    "}"
-    "__dwtWlog({t:Date.now(),src:\"sweep-tick\",all:list.length,match,"
-    "urls:urls.slice(0,50),ver:\"v36\"})"
-    "}catch(e){const d=__dwtErr(e);__dwtWlog({t:Date.now(),src:\"sweep-tick-err\","
-    "err:d.msg,stack:d.stack,ver:\"v36\"})}};"
-    "__dwtTick();"
-    "setInterval(__dwtTick,3e3);"
-    "try{Pj.on(\"web-contents-created\",(e,wc)=>{"
-    "const go=()=>__dwtInj(wc,\"v36-created\");"
-    "try{wc.on(\"did-finish-load\",go)}catch{}"
-    "try{wc.on(\"did-navigate\",go)}catch{}"
-    "try{wc.on(\"did-navigate-in-page\",go)}catch{}"
-    "try{wc.on(\"dom-ready\",go)}catch{}"
-    "})}catch(e){const d=__dwtErr(e);__dwtWlog({t:Date.now(),src:\"v36-hook-err\","
-    "err:d.msg,stack:d.stack})}"
-    "__dwtWlog({t:Date.now(),src:\"v36-boot\",msg:\"global sweep armed\","
-    "bootLen:__dwtBoot.length})"
-    "}catch(e){try{__dwtAFS(\""
-    + INJECT_LOG_PROJECT
-    + '",JSON.stringify({t:Date.now(),src:"v36-boot-fail",err:String(e)})+"\\n")'
-    "}catch{}}})();"
-)
 
-# Class helper: same inject + browserViews map sweep (backup to global).
-WC_HELPER = (
-    "__dwtInjectWc(t,src){"
-    "try{"
-    "if(!t||t.isDestroyed())return;"
-    "const n=String(t.getURL()||\"\");"
-    "if(!(/^https?:/i.test(n)&&/doubao|dola/i.test(n)))return;"
-    "const _log=(ok,err,extra)=>{"
-    "try{"
-    "const line=JSON.stringify(Object.assign({"
-    "t:Date.now(),src:String(src||\"\"),url:n,id:t.id,"
-    "ok:!!ok,err:err?String(err&&err.message||err).slice(0,400):null,"
-    "ver:\"v36\""
-    "},extra||{}))+\"\\n\";"
-    f'for(const p of["{INJECT_LOG_PROJECT}",{INJECT_LOG_TEMP_ESM}])'
-    "{try{__dwtAFS(p,line)}catch{"
-    "try{require(\"fs\").appendFileSync(p,line)}catch{}}"
-    "}"
-    "}catch{}"
-    "};"
-    f'const s="{BOOT_JS}";'
-    "_log(!1,\"attempt\",{bootLen:s.length});"
-    "t.executeJavaScript(s).then(()=>_log(!0,null)).catch(e=>_log(!1,e,{"
-    "stack:e&&e.stack?String(e.stack).slice(0,600):null,bootLen:s.length}));"
-    "}catch{}"
-    "}"
-)
+def _find_bv_electron_import(text: str) -> tuple[str, str, str]:
+    """Return (import_statement, app_alias, webContents_alias) for BrowserView electron import."""
+    matches = list(_BV_ELECTRON_IMPORT_RE.finditer(text))
+    if not matches:
+        if ELECTRON_IMPORT in text:
+            return ELECTRON_IMPORT, "Pj", "VP"
+        raise SystemExit(
+            "main.js: BrowserView electron import not found for v3.6 bootstrap"
+        )
+    anchor = text.find("async createBrowserView")
+    if anchor < 0:
+        anchor = text.find("BrowserViewMainService")
+    best = matches[0]
+    best_dist = abs(best.start() - max(anchor, 0))
+    for m in matches:
+        inner = m.group(1)
+        if "webContents as" not in inner or "app as" not in inner:
+            continue
+        dist = abs(m.start() - max(anchor, 0))
+        # Prefer import that appears before createBrowserView and closest to it.
+        if anchor >= 0 and m.start() <= anchor:
+            dist = anchor - m.start()
+        if dist < best_dist or (
+            "webContents as" in m.group(1) and "webContents as" not in best.group(1)
+        ):
+            best, best_dist = m, dist
+    inner = best.group(1)
+    app_m = re.search(r"\bapp as ([A-Za-z_$][\w$]*)", inner)
+    wc_m = re.search(r"\bwebContents as ([A-Za-z_$][\w$]*)", inner)
+    if not app_m or not wc_m:
+        raise SystemExit(
+            "main.js: could not parse app/webContents aliases from BrowserView electron import"
+        )
+    return best.group(0), app_m.group(1), wc_m.group(1)
 
-METHOD_BODY = (
-    f"{WC_HELPER}"
-    "injectDwtLiveBootForState(e){"
-    "try{"
-    "if(!this.__dwtInjectSweep){this.__dwtInjectSweep=1;this.__dwtAllWcSweep=1;"
-    "this.__dwtV35StateSweep=1;"
-    "setInterval(()=>{try{for(const st of this.browserViews.values())"
-    "this.injectDwtLiveBootForState(st)}catch{}},3e3);"
-    "setInterval(()=>{try{"
-    "const list=VP.getAllWebContents();"
-    "for(const wc of list)this.__dwtInjectWc(wc,\"sweep-all\")"
-    "}catch{}},3e3)}"
-    "const t=e?.browserView?.webContents;"
-    "if(t)this.__dwtInjectWc(t,\"state\");"
-    "}catch{}"
-    "}"
-)
+
+def _global_bootstrap(app_alias: str, wc_alias: str) -> str:
+    """Eager global sweep — runs at module load; does NOT wait for BrowserView hooks."""
+    return (
+        f"{FS_IMPORT}"
+        ";(()=>{try{"
+        f"if(globalThis.{V36_MARK})return;globalThis.{V36_MARK}=1;"
+        f"globalThis.{V35_MARK}=1;"
+        f"{HOST_OK}"
+        f"{LOG_HELPER}"
+        f"{ERR_DETAIL};"
+        f'const __dwtBoot="{BOOT_JS}";'
+        "const __dwtInj=(wc,src)=>{try{"
+        "if(!wc||wc.isDestroyed())return;"
+        "const n=String(wc.getURL()||\"\");"
+        "if(!__dwtHostOk(n))return;"
+        "__dwtWlog({t:Date.now(),src:String(src||\"\"),url:n,id:wc.id,ok:!1,"
+        "err:\"attempt\",ver:\"v36\",bootLen:__dwtBoot.length});"
+        "wc.executeJavaScript(__dwtBoot)"
+        ".then(()=>__dwtWlog({t:Date.now(),src:String(src||\"\"),url:n,id:wc.id,"
+        "ok:!0,err:null,ver:\"v36\"}))"
+        ".catch(e=>{const d=__dwtErr(e);__dwtWlog({t:Date.now(),src:String(src||\"\"),"
+        "url:n,id:wc.id,ok:!1,err:d.msg,stack:d.stack,ver:\"v36\","
+        "bootLen:__dwtBoot.length})})"
+        "}catch(e){const d=__dwtErr(e);__dwtWlog({t:Date.now(),"
+        "src:String(src||\"\")+\"-throw\",err:d.msg,stack:d.stack,ver:\"v36\"})}};"
+        "const __dwtTick=()=>{try{"
+        f"const list={wc_alias}.getAllWebContents();"
+        "const urls=[];let match=0;"
+        "for(const wc of list){"
+        "if(wc.isDestroyed())continue;"
+        "let u=\"\";try{u=String(wc.getURL()||\"\")}catch{}"
+        "if(u)urls.push({id:wc.id,url:u.slice(0,180)});"
+        "if(__dwtHostOk(u)){match++;__dwtInj(wc,\"v36-sweep\")}"
+        "}"
+        "__dwtWlog({t:Date.now(),src:\"sweep-tick\",all:list.length,match,"
+        "urls:urls.slice(0,50),ver:\"v36\"})"
+        "}catch(e){const d=__dwtErr(e);__dwtWlog({t:Date.now(),src:\"sweep-tick-err\","
+        "err:d.msg,stack:d.stack,ver:\"v36\"})}};"
+        "__dwtTick();"
+        "setInterval(__dwtTick,3e3);"
+        f"try{{{app_alias}.on(\"web-contents-created\",(e,wc)=>{{"
+        "const go=()=>__dwtInj(wc,\"v36-created\");"
+        "try{wc.on(\"did-finish-load\",go)}catch{}"
+        "try{wc.on(\"did-navigate\",go)}catch{}"
+        "try{wc.on(\"did-navigate-in-page\",go)}catch{}"
+        "try{wc.on(\"dom-ready\",go)}catch{}"
+        "})}catch(e){const d=__dwtErr(e);__dwtWlog({t:Date.now(),src:\"v36-hook-err\","
+        "err:d.msg,stack:d.stack})}"
+        "__dwtWlog({t:Date.now(),src:\"v36-boot\",msg:\"global sweep armed\","
+        "bootLen:__dwtBoot.length})"
+        "}catch(e){try{__dwtAFS(\""
+        + INJECT_LOG_PROJECT
+        + '",JSON.stringify({t:Date.now(),src:"v36-boot-fail",err:String(e)})+"\\n")'
+        "}catch{}}})();"
+    )
+
+
+def _wc_helper() -> str:
+    return (
+        "__dwtInjectWc(t,src){"
+        "try{"
+        "if(!t||t.isDestroyed())return;"
+        "const n=String(t.getURL()||\"\");"
+        "if(!(/^https?:/i.test(n)&&/doubao|dola/i.test(n)))return;"
+        "const _log=(ok,err,extra)=>{"
+        "try{"
+        "const line=JSON.stringify(Object.assign({"
+        "t:Date.now(),src:String(src||\"\"),url:n,id:t.id,"
+        "ok:!!ok,err:err?String(err&&err.message||err).slice(0,400):null,"
+        "ver:\"v36\""
+        "},extra||{}))+\"\\n\";"
+        f'for(const p of["{INJECT_LOG_PROJECT}",{INJECT_LOG_TEMP_ESM}])'
+        "{try{__dwtAFS(p,line)}catch{"
+        "try{require(\"fs\").appendFileSync(p,line)}catch{}}"
+        "}"
+        "}catch{}"
+        "};"
+        f'const s="{BOOT_JS}";'
+        "_log(!1,\"attempt\",{bootLen:s.length});"
+        "t.executeJavaScript(s).then(()=>_log(!0,null)).catch(e=>_log(!1,e,{"
+        "stack:e&&e.stack?String(e.stack).slice(0,600):null,bootLen:s.length}));"
+        "}catch{}"
+        "}"
+    )
+
+
+def _method_body(wc_alias: str) -> str:
+    return (
+        f"{_wc_helper()}"
+        "injectDwtLiveBootForState(e){"
+        "try{"
+        "if(!this.__dwtInjectSweep){this.__dwtInjectSweep=1;this.__dwtAllWcSweep=1;"
+        "this.__dwtV35StateSweep=1;"
+        "setInterval(()=>{try{for(const st of this.browserViews.values())"
+        "this.injectDwtLiveBootForState(st)}catch{}},3e3);"
+        "setInterval(()=>{try{"
+        f"const list={wc_alias}.getAllWebContents();"
+        "for(const wc of list)this.__dwtInjectWc(wc,\"sweep-all\")"
+        "}catch{}},3e3)}"
+        "const t=e?.browserView?.webContents;"
+        "if(t)this.__dwtInjectWc(t,\"state\");"
+        "}catch{}"
+        "}"
+    )
+
+
+# Defaults for module-level references (overwritten in patch_main with discovered aliases).
+GLOBAL_BOOTSTRAP = _global_bootstrap("Pj", "VP")
+WC_HELPER = _wc_helper()
+METHOD_BODY = _method_body("VP")
 
 OLD_BOOT_MARK = "if(window.__dwtLiveBoot||window.__dwtGlassBoot)return"
 NEW_BOOT_MARK = "__dwtBootStubWatch"
@@ -382,8 +514,13 @@ def _replace_embedded_boot_strings(text: str) -> tuple[str, int]:
                 parsed = _extract_dq_string(text, i)
                 if parsed and all(m in parsed[0] for m in ("boot-stub", "live-boot.js")):
                     _val, a, b = parsed
-                    # Skip if already fixed
-                    if FIXED_BOOT_MARK in _val and V36_BOOT_MARK in _val and BROKEN_BOOT_MARK not in _val:
+                    # Skip if already fixed (v37+ staleNav)
+                    if (
+                        FIXED_BOOT_MARK in _val
+                        and V39_BOOT_MARK in _val
+                        and STALE_NAV_REV10_MARK in _val
+                        and BROKEN_BOOT_MARK not in _val
+                    ):
                         out.append(text[i:b])
                         i = b
                         continue
@@ -396,8 +533,27 @@ def _replace_embedded_boot_strings(text: str) -> tuple[str, int]:
     return "".join(out), count
 
 
-def _ensure_global_bootstrap(text: str) -> tuple[str, bool]:
-    """Insert or upgrade FS import + eager VP/Pj sweep after BrowserView electron import."""
+def _apply_hook_variants(
+    text: str, variants: list[tuple[str, str]], label: str
+) -> tuple[str, bool]:
+    """Apply first matching (old→new) hook pair. Returns (text, changed)."""
+    for _old, new in variants:
+        if new in text:
+            print(f"main.js: {label} inject already present")
+            return text, False
+    for old, new in variants:
+        if old in text:
+            text = text.replace(old, new, 1)
+            print(f"main.js: hooked {label} → injectDwtLiveBootForState")
+            return text, True
+    print(f"main.js: WARNING {label} hook pattern not found")
+    return text, False
+
+
+def _ensure_global_bootstrap(
+    text: str, electron_import: str, bootstrap: str
+) -> tuple[str, bool]:
+    """Insert or upgrade FS import + eager sweep after BrowserView electron import."""
     has_v35 = V35_MARK in text and SWEEP_TICK_MARK in text and "__dwtAFS" in text
     has_v36 = V36_MARK in text and FIXED_BOOT_MARK in text and V36_BOOT_MARK in text
     # Broken partial upgrade: v36 IIFE + leftover v35-sweep tick (cut at BOOT_JS `})();`).
@@ -406,7 +562,7 @@ def _ensure_global_bootstrap(text: str) -> tuple[str, bool]:
     )
     if has_v36 and BROKEN_BOOT_MARK not in text and not dup_tick:
         return text, False
-    if ELECTRON_IMPORT not in text:
+    if electron_import not in text:
         raise SystemExit("main.js: BrowserView electron import not found for v3.6 bootstrap")
 
     if (has_v35 and not has_v36) or dup_tick:
@@ -437,11 +593,11 @@ def _ensure_global_bootstrap(text: str) -> tuple[str, bool]:
         if end < 0:
             raise SystemExit("main.js: cannot find V35 bootstrap IIFE end after anchor")
         end = end + len("})();")
-        text = text[:fs_at] + GLOBAL_BOOTSTRAP + text[end:]
+        text = text[:fs_at] + bootstrap + text[end:]
         return text, True
 
     if not has_v35:
-        text = text.replace(ELECTRON_IMPORT, ELECTRON_IMPORT + GLOBAL_BOOTSTRAP, 1)
+        text = text.replace(electron_import, electron_import + bootstrap, 1)
         return text, True
 
     # has_v36 but still broken boot somewhere — fall through to string replace
@@ -451,50 +607,43 @@ def _ensure_global_bootstrap(text: str) -> tuple[str, bool]:
 def patch_main() -> None:
     text = MAIN.read_text(encoding="utf-8")
     changed = False
+    electron_import, app_alias, wc_alias = _find_bv_electron_import(text)
+    bootstrap = _global_bootstrap(app_alias, wc_alias)
+    method_body = _method_body(wc_alias)
+    print(
+        f"main.js: BrowserView electron aliases app={app_alias} webContents={wc_alias}"
+    )
 
-    if HOOK_NEW not in text and HOOK_OLD in text:
-        bak = backup(MAIN)
-        print("main.js backup:", bak)
-        text = text.replace(HOOK_OLD, HOOK_NEW, 1)
-        changed = True
-        print("main.js: hooked did-finish-load")
-
-    if FOCUS_HOOK_NEW not in text and FOCUS_HOOK_OLD in text:
+    text, ch = _apply_hook_variants(text, HOOK_VARIANTS, "did-finish-load")
+    if ch:
         if not changed:
             bak = backup(MAIN)
             print("main.js backup:", bak)
-        text = text.replace(FOCUS_HOOK_OLD, FOCUS_HOOK_NEW, 1)
         changed = True
-        print("main.js: hooked webContents focus → injectDwtLiveBootForState")
-    elif FOCUS_HOOK_NEW in text:
-        print("main.js: focus inject already present")
 
-    if NAV_HOOK_NEW not in text and NAV_HOOK_OLD in text:
+    text, ch = _apply_hook_variants(text, FOCUS_HOOK_VARIANTS, "webContents focus")
+    if ch:
         if not changed:
             bak = backup(MAIN)
             print("main.js backup:", bak)
-        text = text.replace(NAV_HOOK_OLD, NAV_HOOK_NEW, 1)
         changed = True
-        print("main.js: hooked did-navigate → injectDwtLiveBootForState")
-    elif NAV_HOOK_NEW in text:
-        print("main.js: did-navigate inject already present")
-    else:
-        print("main.js: WARNING did-navigate hook pattern not found")
 
-    if NAV_INPAGE_NEW not in text and NAV_INPAGE_OLD in text:
+    text, ch = _apply_hook_variants(text, NAV_HOOK_VARIANTS, "did-navigate")
+    if ch:
         if not changed:
             bak = backup(MAIN)
             print("main.js backup:", bak)
-        text = text.replace(NAV_INPAGE_OLD, NAV_INPAGE_NEW, 1)
         changed = True
-        print("main.js: hooked did-navigate-in-page → injectDwtLiveBootForState")
-    elif NAV_INPAGE_NEW in text:
-        print("main.js: did-navigate-in-page inject already present")
-    else:
-        print("main.js: WARNING did-navigate-in-page hook pattern not found")
+
+    text, ch = _apply_hook_variants(text, NAV_INPAGE_VARIANTS, "did-navigate-in-page")
+    if ch:
+        if not changed:
+            bak = backup(MAIN)
+            print("main.js backup:", bak)
+        changed = True
 
     # v3.6 eager global bootstrap (must run even when no BrowserView event fires)
-    text2, boot_added = _ensure_global_bootstrap(text)
+    text2, boot_added = _ensure_global_bootstrap(text, electron_import, bootstrap)
     if boot_added:
         if not changed:
             bak = backup(MAIN)
@@ -524,7 +673,7 @@ def patch_main() -> None:
         if not changed:
             bak = backup(MAIN)
             print("main.js backup:", bak)
-        text = text.replace(METHOD_ANCHOR, METHOD_BODY + METHOD_ANCHOR, 1)
+        text = text.replace(METHOD_ANCHOR, method_body + METHOD_ANCHOR, 1)
         MAIN.write_text(text, encoding="utf-8")
         print("main.js: inserted injectDwtLiveBootForState + __dwtInjectWc (v3.6)")
         return
@@ -541,18 +690,18 @@ def patch_main() -> None:
         and ALL_WC_MARK in old_method
         and WC_HELPER_MARK in old_method
         and LOG_MARK in old_method
-        and "VP.getAllWebContents" in old_method
+        and f"{wc_alias}.getAllWebContents" in old_method
         and "/doubao|dola/i" in old_method
         and "__dwtAFS" in old_method
         and FIXED_BOOT_MARK in old_method
-        and V36_BOOT_MARK in old_method
+        and STALE_NAV_REV10_MARK in old_method
         and BROKEN_BOOT_MARK not in old_method
     )
     if need_method_upgrade:
         if not changed:
             bak = backup(MAIN)
             print("main.js backup:", bak)
-        text = text[:start] + METHOD_BODY + text[end:]
+        text = text[:start] + method_body + text[end:]
         changed = True
         print("main.js: upgraded injectDwtLiveBootForState (boot-stub v3.6)")
     else:
@@ -700,10 +849,11 @@ def _ensure_preload_ping(text: str) -> str:
 
 
 def _force_preload_boot(text: str) -> tuple[str, bool]:
-    """Rewrite const boot = \"...\" to current BOOT_JS when missing v3.6 marks."""
+    """Rewrite const boot = \"...\" to current BOOT_JS when missing v3.7 marks."""
     if (
         FIXED_BOOT_MARK in text
-        and V36_BOOT_MARK in text
+        and V39_BOOT_MARK in text
+        and STALE_NAV_REV10_MARK in text
         and BROKEN_BOOT_MARK not in text
         and NEW_BOOT_MARK in text
     ):
@@ -726,8 +876,58 @@ def _force_preload_boot(text: str) -> tuple[str, bool]:
     return text, True
 
 
+def _preload_inject_iife() -> str:
+    """Full dwt-glass-inject IIFE for a clean (reinstalled) preload-browser.js."""
+    host = _preload_host_block_new()
+    ping_try = _preload_ping_and_try_block()
+    return (
+        "\n;(function () {\n"
+        f"  /* {PRELOAD_MARK} */\n"
+        '  try {\n'
+        '    const { webFrame } = require("electron");\n'
+        f"{host}"
+        f'    const boot =\n      "{BOOT_JS}";\n'
+        f"{ping_try}"
+        "    tryInject();\n"
+        '    window.addEventListener("DOMContentLoaded", tryInject);\n'
+        '    window.addEventListener("pageshow", tryInject);\n'
+        '    window.addEventListener("focus", tryInject);\n'
+        '    document.addEventListener("visibilitychange", () => {\n'
+        '      if (document.visibilityState === "visible") tryInject();\n'
+        "    });\n"
+        "    if (!window.__dwtPreloadInjectInterval) {\n"
+        "      window.__dwtPreloadInjectInterval = setInterval(tryInject, 5000);\n"
+        "    }\n"
+        '  } catch (e) {\n'
+        '    console.error("[dwt-glass-inject]", e);\n'
+        "  }\n"
+        "})();\n"
+    )
+
+
+def _ensure_preload_inject_block(text: str) -> tuple[str, bool]:
+    if PRELOAD_MARK in text:
+        return text, False
+    block = _preload_inject_iife()
+    # Prefer insert before trailing sourceMappingURL comment if present.
+    marker = "\n//# sourceMappingURL="
+    idx = text.find(marker)
+    if idx >= 0:
+        text = text[:idx] + block + text[idx:]
+    else:
+        text = text.rstrip() + block
+    return text, True
+
+
 def patch_preload() -> None:
     text = PRELOAD.read_text(encoding="utf-8")
+    text, inserted = _ensure_preload_inject_block(text)
+    if inserted:
+        bak = backup(PRELOAD)
+        print("preload backup:", bak)
+        PRELOAD.write_text(text, encoding="utf-8")
+        text = PRELOAD.read_text(encoding="utf-8")
+        print("preload: inserted fresh dwt-glass-inject IIFE (post-reinstall)")
     if PRELOAD_MARK not in text:
         raise SystemExit("preload-browser.js missing dwt-glass-inject block")
 

@@ -48,7 +48,9 @@ _BOOT_BUSY_JS = (
     b"window.__dwtFullBootRunning=false;}catch(e){}})();"
 )
 
-# One response = chrome-mock + cores + gear/prompt/nav (avoids 8× fetch on 6-conn host).
+# One response = chrome-mock + cores + gear/prompt/nav/snip (avoids 8× fetch on 6-conn host).
+# selection-tools = #dwt-snip-toggle (blue pin next to prompt chips); must not wait on full bundle
+# because live-boot gate early-returns once uiReady (gear+prompt+nav) and skips full fetch.
 _CRITICAL_BUNDLE_FILES = (
     "dev/chrome-mock.js",
     "content/core/selector-manager.js",
@@ -58,6 +60,7 @@ _CRITICAL_BUNDLE_FILES = (
     "content/features/debug-panel/module.js",
     "content/features/prompt-bar/module.js",
     "content/features/navigator/module.js",
+    "content/features/selection-tools/module.js",
 )
 _critical_bundle_cache = None  # (mtimes_tuple, bytes)
 
@@ -409,7 +412,7 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
                         data = None
                     else:
                         data = (
-                            b"// dwt-live-boot: critical-inline v37\n"
+                            b"// dwt-live-boot: critical-inline v45\n"
                             + crit
                             + b"\n// dwt-live-boot: gate\n"
                             + gate

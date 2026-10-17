@@ -543,6 +543,15 @@
     restoreHighlights, hotReload, _ready: true,
   };
 
-  loadStore().then(mount);
+  // Mount with defaults first — do not block #dwt-snip-toggle on hung storage (Glass→5179).
+  mount();
+  loadStore().then(function () {
+    if (!enabled) setEnabled(false);
+    else {
+      ensureToggle();
+      renderPanel();
+      scheduleRestoreHighlights();
+    }
+  }).catch(function () {});
   console.log('[cs][doubao-web-toolkit] selection-tools ready (#84/#101)');
 })();

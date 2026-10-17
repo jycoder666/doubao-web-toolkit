@@ -3,18 +3,59 @@
 //   - 2026-10-16 美化: 宽 200px / 字号 12px / 圆角徽标序号 / hover 微动效 /
 //     折叠按钮 / 底部分数统计 / backdrop 毛玻璃 / 自定义细滚动条。
 //   - 定位右侧 (豆包左侧有 280px 会话栏), top:84px 避开顶部栏。
-//   - 打开对话时自动从顶扫到底，一次收齐当前会话里已加载的用户提问。
+//   - 2026-10-17 采集去卡顿: 不再开机强制顶→底滚扫；优先 DOM/Fiber，
+//     自然滚动 + MutationObserver 增量合并。
+//   - 2026-10-17 rev5: 取消自动 softSweep（刷新后仍会顶→底拖滚动）；采集纯被动，
+//     未挂载历史靠用户自然滚动补齐。软扫代码保留但默认不调度。
+//   - 2026-10-17 rev6: 优先 CSS 美化豆包原生左侧 gutter（滑动已有标题浮层）；
+//     检测到 gutter 则隐藏 #dwt-nav，只补刻度/浮层样式 + 轻量总数徽标。
+//   - 2026-10-17 rev7: 将原生 gutter 用 CSS 挪到右侧（对齐原 #dwt-nav：right:12px），
+//     继续隐藏自绘导航，仅美化原生刻度 + 浮层 + 总数。
+//   - 2026-10-17 rev8: 修复 gutter CSS 过激导致原生消失、#dwt-nav 被卸掉后双无；
+//     仅定位 aside[class*="gutter"]，可见性检查失败则回退面板。
+//   - 2026-10-17 rev9: gutter 成功时不再 remove #dwt-nav（仅 CSS 隐藏）；同 rev 重注入
+//     若面板缺失且非 gutter-ok 则强制 remount，避免 stub 循环后双无。
+//   - 2026-10-17 rev10: gutter 挪右时强制 min-width:34px，避免 aside 塌成 ~3px；
+//     美化失败则永久放弃 gutter、卸样式不残废原生，并强制 #dwt-nav 可见（不闪卸）。
 (function () {
   'use strict';
 
   const dwt = window.dwt = window.dwt || {};
   // 防重复注入：同 revision 再挂只同步 z-index；revision 升了则先 destroy 再装新逻辑
-  const NAV_REV = 3;
+  const NAV_REV = 10;
   if (dwt.navigatorModule && dwt.navigatorModule.rev === NAV_REV) {
     console.log('[cs][doubao-web-toolkit] navigator already mounted, skip re-init');
-    // 仍同步 z-index，避免旧会话里导航盖住豆包原生浮层
     const existing = document.getElementById('dwt-nav');
-    if (existing) existing.style.zIndex = '100';
+    if (existing) {
+      existing.style.zIndex = '200';
+      existing.style.display = 'flex';
+      existing.style.visibility = 'visible';
+      existing.style.opacity = '1';
+      existing.style.pointerEvents = 'auto';
+      try {
+        if (typeof dwt.navigatorModule.mode === 'function'
+          && dwt.navigatorModule.mode() !== 'gutter-css') {
+          document.documentElement.classList.remove('dwt-gutter-ok');
+        }
+      } catch (e) { /* ignore */ }
+    } else {
+      // 同 rev 热注入：面板被旧逻辑卸掉且 gutter 不可用时补挂，禁止双无
+      try {
+        const mode = typeof dwt.navigatorModule.mode === 'function'
+          ? dwt.navigatorModule.mode()
+          : '';
+        const gutterOk = mode === 'gutter-css'
+          && document.documentElement.classList.contains('dwt-gutter-ok')
+          && !!document.querySelector('aside[class*="gutter"]');
+        if (!gutterOk) {
+          if (typeof dwt.navigatorModule.ensureNavAlive === 'function') {
+            dwt.navigatorModule.ensureNavAlive();
+          } else {
+            dwt.navigatorModule.mount?.();
+          }
+        }
+      } catch (e) { /* remount best-effort */ }
+    }
     return;
   }
   if (dwt.navigatorModule) {
@@ -22,6 +63,8 @@
     try {
       document.getElementById('dwt-nav')?.remove();
       document.getElementById('dwt-nav-style')?.remove();
+      document.getElementById('dwt-gutter-style')?.remove();
+      document.getElementById('dwt-gutter-count')?.remove();
     } catch (e) { /* DOM 清理失败不阻断重装 */ }
     dwt.navigatorModule = null;
   }
@@ -29,10 +72,11 @@
   const SEL_USER_BUBBLE = '[class*="bg-g-send-msg-bubble-bg"]';
   const PANEL_ID = 'dwt-nav';
   const STYLE_ID = 'dwt-nav-style';
-  const SCAN_BUDGET_MS = 18000; // 整次全量扫描硬超时，避免宿主页一直被程序滚动
-  const SWEEP_MAX_STEPS = 80;
-  const PULL_MAX = 6;
-
+  const GUTTER_STYLE_ID = 'dwt-gutter-style';
+  const GUTTER_COUNT_ID = 'dwt-gutter-count';
+  // 只认带 gutter 哈希的 aside，避免误伤其它 left-12 侧栏
+  const SEL_GUTTER_ASIDE = 'aside[class*="gutter"]';
+  const SEL_GUTTER_TICKS = 'aside[class*="gutter"] [class*="w-34"]';
   let navList = [];
   let keyword = '';
   let collapsed = false;
@@ -44,6 +88,7 @@
   let activeChatId = '';     // 当前 URL 里的 /chat/<id>
   let lastFullScanChatId = '';
   let lastFullScanAt = 0;
+  let userInterruptGen = 0;  // 用户滚轮/触摸时自增（jumpTo 也会记一笔）
 
   function bubbleText(node) {
     return (node.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 80);
@@ -90,10 +135,6 @@
     const fromManager = dwt.selectorManager?.getScroller?.();
     if (fromManager) return fromManager;
     return document.querySelector('[class*="v_list_scroller"]');
-  }
-
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   function collectUserQuestions() {
@@ -254,7 +295,7 @@
     box.innerHTML = rows.length ? rows.join('') : '<div style="color:#8b949e;padding:6px;text-align:center;font-size:11px;">无匹配</div>';
     const footer = document.querySelector('#' + PANEL_ID + ' .dwt-nav-footer');
     if (footer) {
-      if (scanning) footer.textContent = '正在读取全部提问…';
+      if (scanning) footer.textContent = '补全中… 已 ' + navList.length + ' 条';
       else {
         footer.textContent = '共 ' + navList.length + ' 条';
       }
@@ -366,7 +407,106 @@
     });
   }
 
+  function noteUserInterrupt() {
+    userInterruptGen++;
+  }
+
+  function bindUserInterrupt(sc) {
+    if (!sc || sc._dwtNavInterruptBound) return;
+    sc._dwtNavInterruptBound = true;
+    const opts = { passive: true, capture: true };
+    sc.addEventListener('wheel', noteUserInterrupt, opts);
+    sc.addEventListener('touchstart', noteUserInterrupt, opts);
+    sc.addEventListener('pointerdown', noteUserInterrupt, opts);
+  }
+
+  // 从 React fiber / props 里尽量抽出用户提问，避免为虚拟列表强制滚扫。
+  // 启发式：带 role/user 标记的消息，或 content/text 字段；深度与条数有硬上限。
+  function tryHarvestFromFiber(sc) {
+    if (!sc) return [];
+    const fiberKey = Object.keys(sc).find((k) => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+    if (!fiberKey) return [];
+    const out = [];
+    const seen = new Set();
+    const pushText = (raw) => {
+      if (typeof raw !== 'string') return;
+      const t = raw.trim().replace(/\s+/g, ' ').slice(0, 80);
+      if (!t || t.length < 1 || seen.has(t)) return;
+      seen.add(t);
+      out.push(t);
+    };
+    const looksUser = (obj) => {
+      if (!obj || typeof obj !== 'object') return false;
+      const role = obj.role || obj.author || obj.sender || obj.from || obj.type || obj.message_type;
+      if (role == null) return false;
+      const s = String(role).toLowerCase();
+      return s === 'user' || s === 'human' || s === 'self' || s === '1'
+        || s.indexOf('user') >= 0 || s.indexOf('human') >= 0;
+    };
+    const takeFromMsg = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (!looksUser(obj)) return;
+      const c = obj.content ?? obj.text ?? obj.message ?? obj.prompt ?? obj.query;
+      if (typeof c === 'string') pushText(c);
+      else if (Array.isArray(c)) {
+        c.forEach((part) => {
+          if (typeof part === 'string') pushText(part);
+          else if (part && typeof part.text === 'string') pushText(part.text);
+          else if (part && typeof part.content === 'string') pushText(part.content);
+        });
+      } else if (c && typeof c === 'object' && typeof c.text === 'string') pushText(c.text);
+    };
+    const scanArray = (arr, depth) => {
+      if (!Array.isArray(arr) || depth > 4 || out.length > 200) return;
+      if (arr.length < 2 || arr.length > 500) return;
+      for (let i = 0; i < arr.length && out.length <= 200; i++) {
+        const item = arr[i];
+        if (typeof item === 'string') continue;
+        takeFromMsg(item);
+        if (item && typeof item === 'object') {
+          if (item.message) takeFromMsg(item.message);
+          if (item.data) takeFromMsg(item.data);
+        }
+      }
+    };
+    const visitProps = (props, depth) => {
+      if (!props || depth > 3 || out.length > 200) return;
+      for (const key of Object.keys(props)) {
+        if (key === 'children' || key === 'ref' || key.startsWith('__')) continue;
+        const val = props[key];
+        if (Array.isArray(val)) scanArray(val, depth + 1);
+        else if (val && typeof val === 'object' && Array.isArray(val.list)) scanArray(val.list, depth + 1);
+        else if (val && typeof val === 'object' && Array.isArray(val.messages)) scanArray(val.messages, depth + 1);
+        else if (val && typeof val === 'object' && Array.isArray(val.items)) scanArray(val.items, depth + 1);
+      }
+    };
+    let fiber = sc[fiberKey];
+    let walked = 0;
+    // 先沿 return 链找列表数据（虚拟 scroller 的父级常挂 dataSource）
+    for (let i = 0; fiber && i < 12; i++) {
+      visitProps(fiber.memoizedProps || fiber.pendingProps, 0);
+      fiber = fiber.return;
+      walked++;
+      if (out.length >= 3) break;
+    }
+    // 不够再浅扫 child 子树
+    if (out.length < 3) {
+      fiber = sc[fiberKey];
+      const stack = fiber ? [fiber.child] : [];
+      while (stack.length && walked < 80 && out.length < 200) {
+        const f = stack.pop();
+        if (!f) continue;
+        walked++;
+        visitProps(f.memoizedProps || f.pendingProps, 0);
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+    }
+    return out;
+  }
+
   async function jumpTo(text) {
+    noteUserInterrupt(); // 用户主动跳转：停掉后台软扫，避免抢滚
     let node = findBubble(text);
     const sc = getScroller();
     if (!node && sc) {
@@ -397,73 +537,6 @@
     if (node) highlight(node);
   }
 
-  // 从顶扫到底。步长小于一屏，保证相邻窗口有重叠，漏掉的气泡不会被接丢。
-  // shouldAbort / deadline：会话切换或超时立刻停滚，避免虚拟列表 height 一直涨时空转。
-  async function sweep(sc, shouldAbort, deadline) {
-    let texts = [];
-    let y = 0;
-    let guard = 0;
-    let prev = '';
-    let lastLen = 0;
-    let stagnant = 0;
-    let lastH = -1;
-    let heightStuck = 0;
-    while (guard++ < SWEEP_MAX_STEPS) {
-      if (shouldAbort && shouldAbort()) break;
-      if (deadline && Date.now() >= deadline) break;
-      if (!sc.isConnected) break;
-      nudge(sc, y);
-      prev = await waitForWindow(prev, y === 0 ? 500 : 220, shouldAbort);
-      texts = mergeTexts(texts, visibleTexts());
-      if (texts.length > lastLen) {
-        stagnant = 0;
-        lastLen = texts.length;
-      } else {
-        stagnant++;
-      }
-      const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
-      if (sc.scrollHeight <= lastH + 2) heightStuck++;
-      else heightStuck = 0;
-      lastH = sc.scrollHeight;
-      // 已到底，或连续多步既无新文案也无高度增长 → 停止本趟
-      if (y >= max - 2) break;
-      if (stagnant >= 4 && heightStuck >= 3) break;
-      y = Math.min(max, y + stepSize(sc));
-    }
-    return texts;
-  }
-
-  // 豆包把“用户滚到顶”才当成要拉更早的消息。程序改 scrollTop 不会触发，要走它自己的滚动回调。
-  function requestOlder(sc) {
-    const fiberKey = Object.keys(sc).find((k) => k.startsWith('__reactFiber'));
-    let fiber = fiberKey ? sc[fiberKey] : null;
-    for (let i = 0; fiber && i < 8; i++) {
-      const node = fiber.stateNode;
-      const fn = node && node.props && node.props.onScroll;
-      if (typeof fn === 'function' && String(fn).indexOf('isUserScrolling') >= 0) {
-        try {
-          fn.call(node, { x: 0, y: 0 }, { forward: false, isUserScrolling: true, isMouseDown: false });
-          return;
-        } catch (e) { /* 页面改版后走滚轮兜底 */ }
-      }
-      fiber = fiber.return;
-    }
-    sc.dispatchEvent(new WheelEvent('wheel', { deltaY: -800, bubbles: true, cancelable: true }));
-  }
-
-  async function pullOlder(sc) {
-    if (!sc || !sc.isConnected) return false;
-    const beforeH = sc.scrollHeight;
-    const beforeKey = visibleTexts().join('\n');
-    nudge(sc, 0);
-    requestOlder(sc);
-    await sleep(700);
-    if (!sc.isConnected) return false;
-    const grewH = sc.scrollHeight > beforeH + 80;
-    const grewT = visibleTexts().join('\n') !== beforeKey;
-    return grewH || grewT;
-  }
-
   function getChatId() {
     const m = String(location.pathname || '').match(/\/chat\/(\d+)/);
     return m ? m[1] : '';
@@ -474,84 +547,58 @@
     let merged = texts && texts.length ? texts.slice() : [];
     merged = mergeTexts(merged, visibleTexts());
     navList = merged.map((text) => ({ text }));
-    if (navList.length && !document.getElementById(PANEL_ID)) mount();
+    if (!document.getElementById(PANEL_ID)) mount();
     else { renderItems(); markCurrent(); }
   }
 
+  // 主入口：只用 DOM(+Fiber) 填表，绝不自动改 scrollTop。
+  // 虚拟列表未挂载的更早提问：等用户自然滚动，由 onScrollMark / MutationObserver 合并。
+  function postNavBeacon(extra) {
+    try {
+      const body = JSON.stringify(Object.assign({
+        href: String(location.href || ''),
+        nav: !!document.getElementById(PANEL_ID),
+        navRev: NAV_REV,
+        autoScrollSweep: false,
+        navCount: navList.length,
+        reason: 'navigator-loadAll',
+        t: Date.now(),
+      }, extra || {}));
+      const urls = [
+        'http://127.0.0.1:5181/dev/bridge/verify',
+        'http://127.0.0.1:5179/dev/bridge/verify',
+      ];
+      urls.forEach((u) => {
+        try {
+          if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+            navigator.sendBeacon(u, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+          }
+          fetch(u, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body, mode: 'cors', keepalive: true }).catch(() => {});
+        } catch (e) { /* ignore */ }
+      });
+    } catch (e) { /* ignore */ }
+  }
+
   async function loadAll() {
-    if (scanning) return;
     const gen = ++scanGen;
     const chatAtStart = getChatId();
     activeChatId = chatAtStart || activeChatId;
-    const deadline = Date.now() + SCAN_BUDGET_MS;
-    const aborted = () => gen !== scanGen || getChatId() !== chatAtStart || Date.now() >= deadline;
 
-    // 会话切换后 scroller 可能已换节点，清掉选择器缓存再取
     try { dwt.selectorManager?.invalidate?.(); } catch (e) { /* 无 selectorManager 时忽略 */ }
     const sc = getScroller();
-    const visibleNow = visibleTexts();
+    if (sc) bindUserInterrupt(sc);
 
-    // 无可滚区域：直接用当前视口，不必程序滚动
-    if (!sc || sc.scrollHeight <= sc.clientHeight + 40) {
-      if (gen !== scanGen) return;
-      applyScanResult(visibleNow);
-      lastFullScanChatId = chatAtStart;
-      lastFullScanAt = Date.now();
-      return;
-    }
+    let texts = visibleTexts();
+    const fiberTexts = tryHarvestFromFiber(sc);
+    if (fiberTexts.length) texts = mergeTexts(fiberTexts, texts);
 
-    // 短路径：视口已有条目，且列表高度几乎等于视口（已全部在屏）→ 不扫
-    if (visibleNow.length && sc.scrollHeight <= sc.clientHeight + 80) {
-      if (gen !== scanGen) return;
-      applyScanResult(visibleNow);
-      lastFullScanChatId = chatAtStart;
-      lastFullScanAt = Date.now();
-      return;
-    }
-
-    scanning = true;
+    if (gen !== scanGen) return;
+    scanning = false;
+    applyScanResult(texts);
+    lastFullScanChatId = chatAtStart;
+    lastFullScanAt = Date.now();
     renderItems();
-    const saved = sc.scrollTop;
-    let texts = visibleNow.slice();
-    try {
-      const pass0 = await sweep(sc, aborted, deadline);
-      if (pass0.length >= texts.length) texts = pass0;
-      else texts = mergeTexts(texts, pass0);
-
-      let pulls = 0;
-      let stagnantPulls = 0;
-      while (pulls < PULL_MAX && !aborted()) {
-        const beforeLen = texts.length;
-        const pulled = await pullOlder(sc);
-        if (!pulled || aborted()) break;
-        pulls++;
-        const pass = await sweep(sc, aborted, deadline);
-        if (pass.length > texts.length) {
-          texts = pass;
-          stagnantPulls = 0;
-        } else {
-          texts = mergeTexts(texts, pass);
-          if (texts.length <= beforeLen) {
-            stagnantPulls++;
-            if (stagnantPulls >= 2) break; // 高度抖了但提问没增多
-          } else {
-            stagnantPulls = 0;
-          }
-        }
-      }
-    } finally {
-      // 仅本代扫描收尾；被 chat switch 作废时不要把空结果写回
-      if (gen === scanGen) {
-        try { if (sc && sc.isConnected) nudge(sc, saved); } catch (e) { /* scroller 可能已随会话销毁 */ }
-        scanning = false;
-        applyScanResult(texts);
-        lastFullScanChatId = chatAtStart;
-        lastFullScanAt = Date.now();
-      } else {
-        // 被作废时也确保不卡在 scanning（onChatSwitch 已清，这里双保险）
-        scanning = false;
-      }
-    }
+    postNavBeacon({ fiberCount: fiberTexts.length });
   }
 
   // 豆包 SPA：点左侧其他会话只改 URL/DOM，不整页刷新。必须重扫导航。
@@ -568,7 +615,7 @@
       if (search) search.value = '';
       renderItems();
     }
-    // 等新会话气泡挂上再全量扫描
+    // 等新会话气泡挂上再被动采集（绝不强制顶→底滚）
     setTimeout(() => {
       if (getChatId() !== activeChatId) return;
       loadAll();
@@ -611,9 +658,10 @@
     // 双保险: inline style 保证面板可见 (即使 injectStyles 因故没跑),
     // CSS class (.dwt-nav-dark) 负责深色切换
     // z-index below Doubao native popovers/menus (often ~1000+) so they are not covered
-    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:100;width:200px;'
+    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:200;width:200px;'
       + 'max-height:60vh;'
       + 'display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;'
+      + 'visibility:visible;opacity:1;pointer-events:auto;'
       + 'background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);'
       + 'border:1px solid rgba(0,0,0,0.06);border-radius:12px;'
       + 'box-shadow:0 8px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);'
@@ -687,7 +735,252 @@
 
   function onScrollMark() {
     if (markTimer) clearTimeout(markTimer);
-    markTimer = setTimeout(markCurrent, 500);
+    markTimer = setTimeout(() => {
+      // 自然滚动时顺带合并视口气泡（虚拟列表换窗主要靠这个补齐）
+      if (!scanning) mergeVisibleIntoList();
+      markCurrent();
+    }, 180);
+  }
+
+  // 把当前挂载的用户气泡并入 navList（不改 scrollTop）
+  function mergeVisibleIntoList() {
+    const visible = visibleTexts();
+    if (!visible.length) return false;
+    const oldTexts = navList.map((item) => item.text);
+    if (oldTexts.length && visible.filter((t) => oldTexts.indexOf(t) >= 0).length === 0) {
+      // 与旧列表无交集：多半换会话，交给 refreshList / onChatSwitch
+      return false;
+    }
+    const merged = mergeTexts(oldTexts, visible);
+    const changed = merged.length !== navList.length
+      || merged.some((text, i) => navList[i]?.text !== text);
+    if (!changed) return false;
+    navList = merged.map((text) => ({ text }));
+    const panel = document.getElementById(PANEL_ID);
+    if (!panel) mount();
+    else { renderItems(); applyDark(); }
+    return true;
+  }
+
+  function findNativeGutter() {
+    return document.querySelector(SEL_GUTTER_ASIDE) || document.querySelector(SEL_GUTTER_TICKS);
+  }
+
+  function findTickColumn() {
+    return document.querySelector(SEL_GUTTER_TICKS);
+  }
+
+  function injectGutterBeautifyCss() {
+    let st = document.getElementById(GUTTER_STYLE_ID);
+    if (!st) {
+      st = document.createElement('style');
+      st.id = GUTTER_STYLE_ID;
+      (document.head || document.documentElement).appendChild(st);
+    }
+    // 挪右 + 保宽：left:auto/right 易把绝对定位 aside 塌成 ~3px，必须 min-width
+    st.textContent = `
+      html.dwt-native-gutter aside[class*="gutter"] {
+        left: auto !important;
+        right: 12px !important;
+        top: 72px !important;
+        bottom: 16px !important;
+        z-index: 100 !important;
+        margin: 0 !important;
+        width: auto !important;
+        min-width: 34px !important;
+        max-width: 48px !important;
+        pointer-events: auto !important;
+      }
+      html.dwt-native-gutter aside[class*="gutter"] [class*="w-34"] {
+        gap: 8px !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        pointer-events: auto !important;
+      }
+      html.dwt-native-gutter aside[class*="gutter"] [class*="w-34"] > * {
+        min-height: 4px !important;
+        min-width: 12px !important;
+        border-radius: 2px !important;
+        opacity: 0.65 !important;
+        transition: opacity .15s ease, transform .15s ease, box-shadow .15s ease !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+      }
+      html.dwt-native-gutter aside[class*="gutter"] [class*="w-34"] > *:hover {
+        opacity: 1 !important;
+        transform: scaleX(1.2);
+        box-shadow: 0 0 0 1px rgba(255,255,255,.35);
+      }
+      #dwt-gutter-count {
+        position: fixed;
+        right: 56px;
+        left: auto !important;
+        bottom: 28px;
+        z-index: 120;
+        min-width: 52px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #e8eaed;
+        background: rgba(32,36,42,.88);
+        border: 1px solid rgba(255,255,255,.12);
+        box-shadow: 0 4px 16px rgba(0,0,0,.35);
+        pointer-events: none;
+        user-select: none;
+      }
+      /* 仅当 gutter 可见检查通过后才隐藏自绘导航（见 enableGutterMode） */
+      html.dwt-native-gutter.dwt-gutter-ok #dwt-nav { display: none !important; }
+    `;
+  }
+
+  function isGutterVisuallyOk() {
+    const gut = findNativeGutter();
+    const col = findTickColumn();
+    if (!gut || !col || col.children.length < 1) return false;
+    const r = gut.getBoundingClientRect();
+    // 可读可点：至少接近原生 w-34；~3px 视为失败
+    if (r.width < 12 || r.height < 80) return false;
+    // 应在视口右半侧（挪右成功）；若仍贴左且几乎不可见也算失败
+    if (r.right < window.innerWidth * 0.55 && r.width < 20) return false;
+    if (r.top > window.innerHeight - 40 || r.bottom < 40) return false;
+    return true;
+  }
+
+  /** position:fixed 的 offsetParent 恒为 null，用矩形判断面板是否在视口内 */
+  function isPanelVisuallyOk() {
+    const nav = document.getElementById(PANEL_ID);
+    if (!nav) return false;
+    const cs = window.getComputedStyle ? getComputedStyle(nav) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0)) {
+      return false;
+    }
+    const r = nav.getBoundingClientRect();
+    if (r.width < 80 || r.height < 40) return false;
+    if (r.bottom < 20 || r.top > window.innerHeight - 20) return false;
+    if (r.right < 20 || r.left > window.innerWidth - 20) return false;
+    return true;
+  }
+
+  function forcePanelVisible() {
+    document.documentElement.classList.remove('dwt-gutter-ok');
+    const nav = document.getElementById(PANEL_ID);
+    if (!nav) return;
+    nav.style.display = 'flex';
+    nav.style.visibility = 'visible';
+    nav.style.opacity = '1';
+    nav.style.pointerEvents = 'auto';
+    nav.style.zIndex = '200';
+    if (!nav.style.position) nav.style.position = 'fixed';
+  }
+
+  function syncGutterCountBadge() {
+    const col = findTickColumn();
+    const gutter = findNativeGutter();
+    if (!col || !gutter) {
+      document.getElementById(GUTTER_COUNT_ID)?.remove();
+      return;
+    }
+    const n = col.children.length;
+    let badge = document.getElementById(GUTTER_COUNT_ID);
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = GUTTER_COUNT_ID;
+      badge.title = '原生导航刻度数（随拖拽加载增多）';
+      (document.body || document.documentElement).appendChild(badge);
+    }
+    badge.textContent = '共 ' + n + ' 条';
+    badge.style.left = 'auto';
+    badge.style.right = '56px';
+    badge.style.bottom = '28px';
+  }
+
+  let gutterMode = false;
+  let gutterObserver = null;
+  // 一次会话内美化失败则不再重试，避免反复 inject/remove 闪原生 / 闪面板
+  let gutterGaveUp = false;
+
+  function ensurePanelMounted() {
+    if (!document.getElementById(PANEL_ID)) {
+      mount();
+      startLiveWatch();
+      loadAll();
+    }
+  }
+
+  /** 至少一种导航可见：gutter-ok 或 #dwt-nav 稳定在视口内 */
+  function ensureNavAlive() {
+    if (gutterMode && findNativeGutter() && isGutterVisuallyOk()) {
+      document.documentElement.classList.add('dwt-gutter-ok');
+      ensurePanelMounted(); // 保留 DOM，由 CSS 隐藏
+      return;
+    }
+    if (gutterMode) {
+      console.warn('[cs][doubao-web-toolkit] gutter not ok; fallback panel');
+      gutterGaveUp = true;
+      disableGutterMode();
+    }
+    ensurePanelMounted();
+    forcePanelVisible();
+    if (!isPanelVisuallyOk()) {
+      // 不 remove 重建（防闪）；再推一次可见样式
+      forcePanelVisible();
+    }
+  }
+
+  function enableGutterMode() {
+    if (gutterGaveUp) return false;
+    if (!findNativeGutter()) return false;
+    // 面板必须先存在：gutter 失败时立刻可见，成功时仅 CSS 隐藏（永不 remove）
+    ensurePanelMounted();
+    injectGutterBeautifyCss();
+    document.documentElement.classList.add('dwt-native-gutter');
+    document.documentElement.classList.remove('dwt-gutter-ok');
+    // 等布局生效后再验可见性；通过才加 dwt-gutter-ok 隐藏面板
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!isGutterVisuallyOk()) {
+          console.warn('[cs][doubao-web-toolkit] gutter CSS move failed; keep #dwt-nav');
+          gutterGaveUp = true;
+          disableGutterMode();
+          ensurePanelMounted();
+          forcePanelVisible();
+          return;
+        }
+        gutterMode = true;
+        document.documentElement.classList.add('dwt-gutter-ok');
+        // 故意不 remove #dwt-nav：stub inc()/同 rev 热注入依赖节点仍在
+        syncGutterCountBadge();
+        if (!gutterObserver) {
+          gutterObserver = new MutationObserver(() => {
+            if (!findNativeGutter() || !isGutterVisuallyOk()) {
+              console.warn('[cs][doubao-web-toolkit] gutter lost; fallback panel');
+              gutterGaveUp = true;
+              disableGutterMode();
+              ensurePanelMounted();
+              forcePanelVisible();
+              return;
+            }
+            syncGutterCountBadge();
+          });
+          const root = findNativeGutter();
+          if (root) gutterObserver.observe(root, { childList: true, subtree: true });
+        }
+        console.log('[cs][doubao-web-toolkit] navigator gutter-css mode (nav-rev ' + NAV_REV + ')');
+      });
+    });
+    return true;
+  }
+
+  function disableGutterMode() {
+    gutterMode = false;
+    document.documentElement.classList.remove('dwt-native-gutter');
+    document.documentElement.classList.remove('dwt-gutter-ok');
+    try { gutterObserver?.disconnect(); } catch (e) { /* ignore */ }
+    gutterObserver = null;
+    document.getElementById(GUTTER_COUNT_ID)?.remove();
+    // 卸掉可能把原生 gutter 搞没的样式（恢复宿主布局）
+    document.getElementById(GUTTER_STYLE_ID)?.remove();
   }
 
   function destroy() {
@@ -698,27 +991,40 @@
     if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
     if (markTimer) { clearTimeout(markTimer); markTimer = null; }
     try { document.removeEventListener('scroll', onScrollMark, true); } catch (e) { /* ignore */ }
+    disableGutterMode();
     try {
       document.getElementById(PANEL_ID)?.remove();
       document.getElementById(STYLE_ID)?.remove();
+      document.getElementById(GUTTER_STYLE_ID)?.remove();
     } catch (e) { /* ignore */ }
   }
 
   dwt.navigatorModule = {
     rev: NAV_REV,
+    mode: function () { return gutterMode ? 'gutter-css' : 'panel'; },
     mount, collectUserQuestions, loadAll, destroy, toggleFitAll, applyFitAll,
+    ensureNavAlive,
     setKeyword(k) { keyword = k || ''; renderItems(); },
     markCurrent,
   };
 
   function bootNav() {
     try {
+      // 先挂面板保底，再尝试 gutter；可见性失败会自动回退面板（面板始终留在 DOM）
       mount();
+      forcePanelVisible();
       startLiveWatch();
       watchRouteChange();
       loadAll();
+      if (findNativeGutter() && !gutterGaveUp) enableGutterMode();
+      setTimeout(function () {
+        if (findNativeGutter() && !gutterMode && !gutterGaveUp) enableGutterMode();
+        ensureNavAlive();
+      }, 800);
+      setTimeout(ensureNavAlive, 2000);
     } catch (e) {
       console.warn('[cs][doubao-web-toolkit] navigator boot failed', e);
+      try { ensurePanelMounted(); forcePanelVisible(); } catch (e2) { /* ignore */ }
     }
   }
 
@@ -727,12 +1033,14 @@
   } else {
     bootNav();
   }
-  // Glass live-boot: retry once if #dwt-nav missing (body late / prior partial boot).
-  if (!document.getElementById(PANEL_ID)) {
-    setTimeout(function () {
-      if (!document.getElementById(PANEL_ID)) bootNav();
-    }, 300);
-  }
+  setTimeout(function () {
+    if (!document.getElementById(PANEL_ID) && !gutterMode) bootNav();
+    else ensureNavAlive();
+  }, 400);
+  // 轻量心跳：防止 SPA 重建 / 旧逻辑卸面板后双无
+  setInterval(function () {
+    try { ensureNavAlive(); } catch (e) { /* ignore */ }
+  }, 3000);
 
   // MutationObserver: 监听气泡出现/变化, 实时追加到列表 (不用等 8 秒轮询)
   function startLiveWatch() {
@@ -757,7 +1065,7 @@
     liveObserver.observe(document.body, { childList: true, subtree: true, characterData: false });
   }
 
-  // 每次全量重扫 + 重绘 (因为豆包可能回收/重建气泡 node, 不能只比条数)
+  // DOM 变化时增量合并（不强制滚扫）。豆包回收/重建气泡时靠 merge 叠窗。
   function refreshList() {
     if (scanning) return;
     if (refreshTimer) clearTimeout(refreshTimer);
@@ -778,7 +1086,7 @@
         const panel = document.getElementById(PANEL_ID);
         if (!panel) mount();
         else { renderItems(); markCurrent(); applyDark(); }
-        // 无交集时先展示视口；本会话刚扫过则不再连环 loadAll（扫滚会抖 DOM）
+        // 无交集：被动 loadAll（DOM+Fiber；软扫可取消），冷却期内不连环触发
         const cool = Date.now() - lastFullScanAt < 8000 && lastFullScanChatId === id;
         if (!scanning && !cool) loadAll();
         return;
@@ -793,8 +1101,8 @@
       else { renderItems(); markCurrent(); applyDark(); }
     }, 150);
   }
-  // 滚动时更新"当前"高亮, 500ms 防抖
+  // 滚动时：高亮当前 + 合并视口气泡
   document.addEventListener('scroll', onScrollMark, true);
 
-  console.log('[cs][doubao-web-toolkit] navigator module ready (beautified v2)');
+  console.log('[cs][doubao-web-toolkit] navigator module ready (nav-rev ' + NAV_REV + ')');
 })();
