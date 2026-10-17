@@ -286,17 +286,31 @@
   }
 
   function mount() {
-    if (document.getElementById(PANEL_ID)) return;
-    const wrap = document.createElement('div');
-    wrap.innerHTML = PANEL_HTML;
-    document.body.appendChild(wrap);
-    document.getElementById(TOGGLE_ID).addEventListener('click', toggle);
-    document.getElementById('dwt-panel-close').addEventListener('click', toggle);
-    document.getElementById('dwt-pick').addEventListener('click', enterPickMode);
-    window.addEventListener('dwt-toggle-debug-panel', toggle);
-    window.dwt?.captchaDetector?.start?.();
+    try {
+      if (document.getElementById(PANEL_ID) || document.getElementById(TOGGLE_ID)) return;
+      const host = document.body || document.documentElement;
+      if (!host) return;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = PANEL_HTML;
+      host.appendChild(wrap);
+      const toggleBtn = document.getElementById(TOGGLE_ID);
+      const closeBtn = document.getElementById('dwt-panel-close');
+      const pickBtn = document.getElementById('dwt-pick');
+      if (toggleBtn) toggleBtn.addEventListener('click', toggle);
+      if (closeBtn) closeBtn.addEventListener('click', toggle);
+      if (pickBtn) pickBtn.addEventListener('click', enterPickMode);
+      window.addEventListener('dwt-toggle-debug-panel', toggle);
+      window.dwt?.captchaDetector?.start?.();
+    } catch (e) {
+      console.warn(LOG, 'debug-panel mount failed', e);
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+  // Glass live-boot: body may appear a tick later after documentElement mount miss.
+  if (!document.getElementById(TOGGLE_ID)) {
+    setTimeout(mount, 0);
+    setTimeout(mount, 250);
+  }
   console.log(LOG, 'debug-panel loaded');
 })();

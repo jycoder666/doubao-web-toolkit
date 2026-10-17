@@ -8,10 +8,22 @@
   'use strict';
 
   const dwt = window.dwt = window.dwt || {};
-  // 防重复注入：live-boot / CDP 再挂一次时旧 interval + 新 loadAll 会叠成死滚
-  if (dwt.navigatorModule) {
+  // 防重复注入：同 revision 再挂只同步 z-index；revision 升了则先 destroy 再装新逻辑
+  const NAV_REV = 3;
+  if (dwt.navigatorModule && dwt.navigatorModule.rev === NAV_REV) {
     console.log('[cs][doubao-web-toolkit] navigator already mounted, skip re-init');
+    // 仍同步 z-index，避免旧会话里导航盖住豆包原生浮层
+    const existing = document.getElementById('dwt-nav');
+    if (existing) existing.style.zIndex = '100';
     return;
+  }
+  if (dwt.navigatorModule) {
+    try { dwt.navigatorModule.destroy?.(); } catch (e) { /* 旧版无 destroy 时忽略 */ }
+    try {
+      document.getElementById('dwt-nav')?.remove();
+      document.getElementById('dwt-nav-style')?.remove();
+    } catch (e) { /* DOM 清理失败不阻断重装 */ }
+    dwt.navigatorModule = null;
   }
 
   const SEL_USER_BUBBLE = '[class*="bg-g-send-msg-bubble-bg"]';
@@ -244,15 +256,15 @@
     if (footer) {
       if (scanning) footer.textContent = '正在读取全部提问…';
       else {
-        footer.textContent = fitAll
-          ? ('共 ' + navList.length + ' 条 · 点击收起高度')
-          : ('共 ' + navList.length + ' 条 · 点击铺开全部');
+        footer.textContent = '共 ' + navList.length + ' 条';
       }
     }
     applyFitAll();
   }
 
   // 铺开模式：面板随内容长高（上限为视口），能放下就整表可见不用滚；放不下才在列表内滚
+  // 紧凑模式：列表固定约 6～7 行高度，底部「点击铺开全部」才有可见效果
+  const COMPACT_ROWS_MAX = '168px';
   function applyFitAll() {
     const panel = document.getElementById(PANEL_ID);
     if (!panel || collapsed) return;
@@ -274,10 +286,17 @@
       if (body) body.style.flex = '1 1 auto';
       if (rows) {
         rows.style.flex = '1 1 auto';
-        rows.style.maxHeight = '';
+        rows.style.maxHeight = COMPACT_ROWS_MAX;
         rows.style.overflowY = 'auto';
       }
     }
+  }
+
+  function toggleFitAll() {
+    if (scanning) return;
+    fitAll = !fitAll;
+    applyFitAll();
+    renderItems();
   }
 
   // 高亮当前视口内最靠上的用户提问 (让用户知道"当前读到哪一条")
@@ -578,12 +597,11 @@
   }
 
   function mount() {
+    // 热更新后旧闭包的 observer 仍可能回调 mount：若已被新 revision 接管则不再建面板
+    if (dwt.navigatorModule && dwt.navigatorModule.mount !== mount) return;
     if (!navList.length) navList = visibleTexts().map((text) => ({ text }));
-    if (!navList.length) {
-      const old = document.getElementById(PANEL_ID);
-      if (old) old.remove();
-      return;
-    }
+    // 空列表也保留 #dwt-nav 壳（显示「暂无提问」），避免 live-boot 验收永远等不到节点；
+    // 有气泡后再 renderItems 填入。
     injectStyles();
     const old = document.getElementById(PANEL_ID);
     if (old) old.remove();
@@ -592,7 +610,8 @@
     nav.id = PANEL_ID;
     // 双保险: inline style 保证面板可见 (即使 injectStyles 因故没跑),
     // CSS class (.dwt-nav-dark) 负责深色切换
-    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:999998;width:200px;'
+    // z-index below Doubao native popovers/menus (often ~1000+) so they are not covered
+    nav.style.cssText = 'position:fixed;right:12px;top:84px;z-index:100;width:200px;'
       + 'max-height:60vh;'
       + 'display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;'
       + 'background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);'
@@ -622,7 +641,9 @@
       + '<div class="dwt-nav-footer" title="点击切换：铺开全部 / 收起高度" style="padding-top:6px;margin-top:6px;border-top:1px solid #f0f2f5;'
       + 'font-size:10px;color:#8b949e;text-align:center;flex-shrink:0;cursor:pointer;"></div>';
 
-    document.body.appendChild(nav);
+    const host = document.body || document.documentElement;
+    if (!host) return;
+    host.appendChild(nav);
     applyDark();
     applyFitAll();
 
@@ -634,22 +655,22 @@
       if (!collapsed) applyFitAll();
     });
 
-    const footerEl = nav.querySelector('.dwt-nav-footer');
-    footerEl.addEventListener('click', () => {
-      if (scanning) return;
-      fitAll = !fitAll;
-      applyFitAll();
-      renderItems();
-    });
-
     const search = nav.querySelector('#dwt-nav-search');
     search.value = keyword;
     search.addEventListener('input', (e) => { keyword = e.target.value; renderItems(); });
     search.addEventListener('keydown', (e) => e.stopPropagation());
 
+    // 页脚切换与行跳转共用面板委托，避免 footer 节点被改写后丢监听；
+    // stopPropagation 减少宿主页全局 click 抢事件
     nav.addEventListener('click', (e) => {
+      if (e.target.closest('.dwt-nav-footer')) {
+        e.stopPropagation();
+        toggleFitAll();
+        return;
+      }
       const el = e.target.closest('[data-idx]');
       if (!el) return;
+      e.stopPropagation();
       const idx = Number(el.dataset.idx);
       const item = navList[idx];
       if (item && item.text) jumpTo(item.text);
@@ -659,24 +680,58 @@
     markCurrent();
   }
 
+  // 必须先声明。document_idle 时 readyState 已不是 loading，会立刻调用 startLiveWatch。
+  let liveObserver = null;
+  let refreshTimer = null;
+  let markTimer = null;
+
+  function onScrollMark() {
+    if (markTimer) clearTimeout(markTimer);
+    markTimer = setTimeout(markCurrent, 500);
+  }
+
+  function destroy() {
+    scanGen++;
+    scanning = false;
+    try { liveObserver?.disconnect(); } catch (e) { /* ignore */ }
+    liveObserver = null;
+    if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+    if (markTimer) { clearTimeout(markTimer); markTimer = null; }
+    try { document.removeEventListener('scroll', onScrollMark, true); } catch (e) { /* ignore */ }
+    try {
+      document.getElementById(PANEL_ID)?.remove();
+      document.getElementById(STYLE_ID)?.remove();
+    } catch (e) { /* ignore */ }
+  }
+
   dwt.navigatorModule = {
-    mount, collectUserQuestions, loadAll,
+    rev: NAV_REV,
+    mount, collectUserQuestions, loadAll, destroy, toggleFitAll, applyFitAll,
     setKeyword(k) { keyword = k || ''; renderItems(); },
     markCurrent,
   };
 
-  // 必须先声明。document_idle 时 readyState 已不是 loading，会立刻调用 startLiveWatch。
-  let liveObserver = null;
+  function bootNav() {
+    try {
+      mount();
+      startLiveWatch();
+      watchRouteChange();
+      loadAll();
+    } catch (e) {
+      console.warn('[cs][doubao-web-toolkit] navigator boot failed', e);
+    }
+  }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      mount(); startLiveWatch(); watchRouteChange(); loadAll();
-    });
+    document.addEventListener('DOMContentLoaded', bootNav);
   } else {
-    mount();
-    startLiveWatch();
-    watchRouteChange();
-    loadAll();
+    bootNav();
+  }
+  // Glass live-boot: retry once if #dwt-nav missing (body late / prior partial boot).
+  if (!document.getElementById(PANEL_ID)) {
+    setTimeout(function () {
+      if (!document.getElementById(PANEL_ID)) bootNav();
+    }, 300);
   }
 
   // MutationObserver: 监听气泡出现/变化, 实时追加到列表 (不用等 8 秒轮询)
@@ -703,7 +758,6 @@
   }
 
   // 每次全量重扫 + 重绘 (因为豆包可能回收/重建气泡 node, 不能只比条数)
-  let refreshTimer = null;
   function refreshList() {
     if (scanning) return;
     if (refreshTimer) clearTimeout(refreshTimer);
@@ -740,11 +794,7 @@
     }, 150);
   }
   // 滚动时更新"当前"高亮, 500ms 防抖
-  let markTimer = null;
-  document.addEventListener('scroll', () => {
-    if (markTimer) clearTimeout(markTimer);
-    markTimer = setTimeout(markCurrent, 500);
-  }, true);
+  document.addEventListener('scroll', onScrollMark, true);
 
   console.log('[cs][doubao-web-toolkit] navigator module ready (beautified v2)');
 })();

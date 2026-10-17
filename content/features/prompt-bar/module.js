@@ -46,6 +46,16 @@
 
   dwt.promptBarModule = { mount, load, getPrompts: () => prompts };
 
-  load().then(mount);
+  // Mount with defaults first — do not block UI on hung storage fetch (Glass→5179).
+  mount();
+  load().then(function () {
+    var bar = document.getElementById('dwt-prompt-bar');
+    if (!bar) mount();
+    else {
+      bar.innerHTML = prompts.map((p, i) =>
+        '<button data-idx="' + i + '" style="padding:2px 8px;border:1px solid #d0d7de;border-radius:12px;background:#fff;cursor:pointer;font-size:11px;color:#2d72de;">' + p.label + '</button>'
+      ).join('');
+    }
+  }).catch(function () {});
   console.log('[cs][doubao-web-toolkit] prompt-bar module ready');
 })();

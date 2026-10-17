@@ -5,3 +5,11 @@ Thumbs.db
 .debug-profile/
 .git-commit-msg.tmp
 dev/.preview-storage.json
+dev/.verify-last.json
+dev/.accept-*
+dev/.ui-verify-poll.json
+dev/._*
+dev/__pycache__/
+dev/_inj_chunks/
+git-pull.bat
+git-pull.token

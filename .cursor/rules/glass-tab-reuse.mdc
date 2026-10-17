@@ -1,0 +1,27 @@
+---
+description: Glass/Doubao browser tab hard gate — never auto-open Doubao; only lock/reuse existing tab
+alwaysApply: true
+---
+
+# Glass Tab Rule（硬闸 · 禁止自动开豆包页）
+
+Source of truth: `D:\other\docs\skills\cursor-builtin-browser-extension\SKILL.md`（硬闸 §5）.
+
+用户当前约定：**Cursor 内置 Glass 里只保留一个豆包聊天页；Agent 不得自行打开新的豆包页面。**
+
+## 绝对禁止（即使用户要求「全程自动 / 零参与 / 自己刷新注入」也适用）
+
+- **禁止** `browser_tabs` `new` 打开任何 `https://www.doubao.com/chat/*`（或会落到豆包 chat 的入口）。
+- **禁止** `open_resource` 打开豆包 URL。
+- **禁止** `browser_navigate` 导航到豆包 URL（若会创建新标签，或 list 里尚无豆包 tab）。
+- **禁止**以「MCP list 为空 / 看不见标签 / 需要可控 tab」为由再开一份豆包页。
+- Hard gate: **no external Chrome**（禁止外开 Chrome 冒充验收）。
+
+## 唯一允许的页面操作
+
+1. `browser_tabs` list（或 last-interacted，省略 `viewId`）。
+2. **仅当** list / last-interacted 已有豆包 chat 标签 → **只 `browser_lock` 该 tab** → 在该 tab 上 `Page.reload` / CDP `fetch+eval` `http://127.0.0.1:5179/dev/live-boot.js` / click / type。
+3. list 若出现**同一 chat URL 的重复标签**：关掉多余的，**只保留一个**，再 lock 留下的那一个。
+4. **若 list 为空 / 无豆包 chat 可见**：停手。只改 inject / serve / 补丁 / 文档；**等待**用户已有或自行打开的标签变为 MCP 可见。**不得** new / open / navigate 豆包。
+
+缺插件 UI 时：只对**已有** tab reload 或 CDP 注入；不要要求用户再开新页，也不要 Agent 代开。

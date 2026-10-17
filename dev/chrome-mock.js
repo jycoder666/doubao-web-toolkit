@@ -4,8 +4,27 @@
 (function () {
   'use strict';
 
-  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) return;
-
+  // 真实扩展 content-script 世界：有 runtime.id 且不在豆包页（preview/popup）时跳过。
+  // Glass 打开的 doubao.com 页即使有残缺 chrome.runtime.id，storage 也常不可用/会挂起，
+  // 必须装 HTTP 桥，否则 prompt-bar 等 await chrome.storage 永远不 mount。
+  function onDoubaoHost() {
+    try {
+      var h = String((location && location.hostname) || '').toLowerCase();
+      return h === 'www.doubao.com' || h === 'www.dola.com'
+        || h.endsWith('.doubao.com') || h.endsWith('.dola.com');
+    } catch (e) {
+      return false;
+    }
+  }
+  if (
+    typeof chrome !== 'undefined'
+    && chrome.runtime
+    && chrome.runtime.id
+    && !onDoubaoHost()
+    && !window.__dwtForceChromeMock
+  ) {
+    return;
+  }
   var PREVIEW_ORIGIN = 'http://127.0.0.1:5179';
   var BUS_URL = PREVIEW_ORIGIN + '/dev/bridge/bus';
   var STORE_URL = PREVIEW_ORIGIN + '/dev/bridge/storage';
@@ -16,7 +35,12 @@
     runtimeListeners: [],
     lastBusId: 0,
     polling: false,
+    pollGen: 0,
   });
+  // 每次注入抬代际，废止旧 wait=20000 长轮询，避免占满 5179 连接槽
+  state.pollGen = (state.pollGen || 0) + 1;
+  var pollGen = state.pollGen;
+  state.polling = false;
 
   var storageListeners = state.storageListeners;
   var runtimeListeners = state.runtimeListeners;
@@ -74,22 +98,31 @@
   }
 
   function pollBus() {
-    if (state.polling) return;
+    if (state.polling && state.pollGen === pollGen) return;
     state.polling = true;
 
+    // 短轮询 wait=0，避免 wait=20000 长连接占满浏览器对 127.0.0.1:5179 的并发槽，
+    // 导致 live-boot 后续模块 fetch 饿死（表现为只装到 domObserver）。
+    function alive() {
+      return state.pollGen === pollGen;
+    }
+
     function loop() {
-      var url = BUS_URL + '?after=' + state.lastBusId + '&wait=20000';
+      if (!alive()) return;
+      var url = BUS_URL + '?after=' + state.lastBusId + '&wait=0';
       fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          if (!alive()) return;
           (data.items || []).forEach(function (item) {
             if (item.id > state.lastBusId) state.lastBusId = item.id;
             handlePacket(item.pkt);
           });
-          loop();
+          setTimeout(loop, 1500);
         })
         .catch(function () {
-          setTimeout(loop, 1000);
+          if (!alive()) return;
+          setTimeout(loop, 2000);
         });
     }
 
@@ -97,20 +130,33 @@
     fetch(BUS_URL + '?after=' + state.lastBusId + '&wait=0')
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        if (!alive()) return;
         (data.items || []).forEach(function (item) {
           if (item.id > state.lastBusId) state.lastBusId = item.id;
         });
-        loop();
+        setTimeout(loop, 1500);
       })
       .catch(function () {
-        setTimeout(loop, 1000);
+        if (!alive()) return;
+        setTimeout(loop, 2000);
       });
   }
 
-  function getAll() {
-    return fetch(STORE_URL)
+  function fetchJson(url, opts, ms) {
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () {
+      try { if (ctrl) ctrl.abort(); } catch (e) {}
+    }, ms || 1500);
+    var o = opts ? Object.assign({}, opts) : {};
+    if (ctrl) o.signal = ctrl.signal;
+    return fetch(url, o)
       .then(function (r) { return r.json(); })
-      .then(function (d) { return d.value || {}; })
+      .finally(function () { clearTimeout(timer); });
+  }
+
+  function getAll() {
+    return fetchJson(STORE_URL, null, 1500)
+      .then(function (d) { return (d && d.value) || {}; })
       .catch(function () { return {}; });
   }
 
@@ -164,7 +210,14 @@
     } catch (_) {}
   })();
 
-  pollBus();
+  // Defer bus poll so critical UI (gear/nav/prompt) can finish on the 6-conn budget.
+  // Immediate pollBus used to hold slots and starve debug-panel/navigator fetches.
+  if (!window.__dwtBusPollScheduled) {
+    window.__dwtBusPollScheduled = true;
+    setTimeout(function () {
+      try { pollBus(); } catch (_) {}
+    }, 4000);
+  }
 
   var dwtChrome = {
     storage: {

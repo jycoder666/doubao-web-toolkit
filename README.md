@@ -18,6 +18,7 @@ Chrome/Edge Manifest V3 浏览器扩展，专门服务 doubao.com / dola.com 网
 | 对话管理（批量清理） | ✅ | 左侧会话列表注入复选框 → 全选/反选 → 批量删除（模拟点击豆包自带菜单，删除前二次确认，默认关闭） |
 | 阅读位置标记 | ✅ | 按会话记录阅读位置（消息序号 + 文本指纹双定位，抗重渲染），重开会话时顶部提示「📌 上次读到第 N 条」+「跳回该条」；点击「跳回该条」/「×」或提示自动淡出后即落盘当前位置，刷新不再重复弹出 |
 | 对话摘要 / 提纲 | ✅ | 本地抽取对话生成 Markdown 提纲（轮次/条数/字数统计 + 每轮问答要点），支持复制与下载，零网络请求（默认关闭） |
+| 划词语料 / 高亮 | ✅ | 对话区划词浮层「收藏 / 高亮」+ 右下角语料板 + 公式悬停复制 LaTeX；**豆包原生选区菜单已含复制，DWT 选区工具栏不再提供复制以免重复** |
 | 对话目录搜索 | ✅ | 导航条顶部搜索框，按关键词实时过滤提问目录项 |
 | 开发热重载 | ✅ | **仅开发用（默认关闭）**：改动源码后自动重载扩展 + 刷新已打开的豆包页面，无需手动去 `chrome://extensions` 点「重新加载」 |
 
@@ -122,9 +123,10 @@ FNV-1a 指纹轮询比对；因 MV3 Service Worker 约 30s 空闲即被终止，
 内置浏览器不能加载 MV3 扩展，开发时靠本地静态服 + 页面注入：
 
 1. 仓库根目录启动：`python dev/serve.py`（`http://127.0.0.1:5179`，已开 CORS / Private Network）
-2. 在豆包页注入：`http://127.0.0.1:5179/dev/live-boot.js`（CDP `Runtime.evaluate` 插 `<script>`，或 Cursor `preload-browser.js` 若可用）
-3. 预览弹窗与豆包页靠 `/dev/bridge/bus` + `/dev/bridge/storage` 互通（`chrome-mock.js`）；选项页保存的批量模板与 popup「开始批量发送」可驱动已注入的豆包页。BroadcastChannel / 第三方 iframe 的 storage 事件会被顶级站点隔离，故不用。
-4. **刷新会清空页面 JS**：`#dwt-nav` 等会消失；preload 未自动注入时须重新执行第 2 步。扩展安装模式不受此限制。
+2. **Glass 自动注入（推荐）**：Cursor `main.js` `did-finish-load` + `webContents focus` → `injectDwtLiveBootForState`；`preload-browser.js`（`dwt-glass-inject`）在 `DOMContentLoaded` / `pageshow` / `focus` / `visibilitychange` 也会 fetch+eval `live-boot.js`（半截 boot / 缺 ⚙·提示词·导航时 incomplete-retry）。补丁：`python dev/_patch_cursor_dwt_inject.py`。**补丁后必须重启 Cursor 一次**，已有 BrowserView 才会加载新 main/preload；之后点回已有豆包页即可触发 inject，不必依赖 MCP。
+3. 手动兜底：CDP `Runtime.evaluate` 插 `<script src="http://127.0.0.1:5179/dev/live-boot.js">`。
+4. 预览弹窗与豆包页靠 `/dev/bridge/bus` + `/dev/bridge/storage` 互通（`chrome-mock.js`，短轮询 `wait=0`）。
+5. **验收前请确认**：Cursor Settings → **Browser Automation = Browser Tab ON** → **补丁后重启 Cursor 一次** → 点回**已有**豆包 chat（或 F5；勿新开第二个相同 URL）。MCP `browser_tabs` 为空时：只做 code/serve，等用户已有标签变为 MCP 可见。验收灯塔：`GET http://127.0.0.1:5179/dev/bridge/verify`（需真实 `doubao.com/chat` href + `toggle`+`promptBar`+`nav`，非 probe）。
 
 ---
 

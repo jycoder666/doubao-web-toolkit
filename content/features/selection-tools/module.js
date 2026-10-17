@@ -1,6 +1,7 @@
 // selection-tools/module.js — 划词语料收藏 + 文字高亮 + LaTeX 快捷复制
 // 对应总表: #101 d-picot（划词收藏）、#84 Better_Doubao（语料板 / 高亮 / LaTeX）
 // 侧栏收纳放弃（易与豆包原生 UI 冲突）；文件夹仍见 conversation-manager
+// 选区工具栏不提供「复制」：豆包原生选区菜单已含复制，避免重复
 (function () {
   'use strict';
 
@@ -17,6 +18,8 @@
   let snippets = [];
   let highlights = {}; // { [chatId]: [{ hash, text, color }] }
   let barHideTimer = null;
+  // 豆包点浮层前常会清掉选区；mousedown preventDefault 不够，收藏必须用展示时缓存的文本
+  let pendingSelText = '';
 
   function chatId() {
     const m = String(location.pathname || '').match(/\/chat\/(\d+)/);
@@ -35,9 +38,13 @@
   }
 
   function injectStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    const st = document.createElement('style');
-    st.id = STYLE_ID;
+    // 热重载时覆盖已有样式，避免 STYLE_ID 已存在导致暗色修复不生效
+    let st = document.getElementById(STYLE_ID);
+    if (!st) {
+      st = document.createElement('style');
+      st.id = STYLE_ID;
+      document.head.appendChild(st);
+    }
     st.textContent = `
       #${BAR_ID} {
         position: fixed; z-index: 999999; display: none; gap: 4px;
@@ -76,10 +83,21 @@
         flex:1; border:1px solid #d0d7de; background:#fff; border-radius:6px;
         padding:4px; cursor:pointer; font-size:11px;
       }
-      mark.dwt-hl { background: #ffe58f; color: inherit; border-radius: 2px; padding: 0 1px; }
-      mark.dwt-hl-green { background: #b7eb8f; }
-      mark.dwt-hl-cyan { background: #87e8de; }
-      mark.dwt-hl-pink { background: #ffadd2; }
+      /* !important: 压过豆包气泡 / theme 清背景 / text-s-color 浅色字（含 mark 内子节点） */
+      mark.dwt-hl, mark[data-dwt-hl="1"],
+      mark.dwt-hl *, mark[data-dwt-hl="1"] * {
+        background-image: none !important;
+        color: #1f2328 !important;
+        -webkit-text-fill-color: #1f2328 !important;
+      }
+      mark.dwt-hl, mark[data-dwt-hl="1"] {
+        background-color: #ffe58f !important;
+        border-radius: 2px; padding: 0 1px;
+        -webkit-box-decoration-break: clone; box-decoration-break: clone;
+      }
+      mark.dwt-hl-green, mark.dwt-hl-green * { background-color: #b7eb8f !important; color: #1f2328 !important; -webkit-text-fill-color: #1f2328 !important; }
+      mark.dwt-hl-cyan, mark.dwt-hl-cyan * { background-color: #87e8de !important; color: #1f2328 !important; -webkit-text-fill-color: #1f2328 !important; }
+      mark.dwt-hl-pink, mark.dwt-hl-pink * { background-color: #ffadd2 !important; color: #1f2328 !important; -webkit-text-fill-color: #1f2328 !important; }
       .dwt-latex-btn {
         margin-left: 4px; font-size: 11px; padding: 0 4px; border-radius: 4px;
         border: 1px solid #d0d7de; background: #fff; cursor: pointer; color: #57606a;
@@ -87,7 +105,6 @@
       }
       .dwt-latex-btn:hover { color: #2d72de; border-color: #2d72de; }
     `;
-    document.head.appendChild(st);
   }
 
   async function loadStore() {
@@ -129,6 +146,7 @@
   function showBar(x, y) {
     const bar = document.getElementById(BAR_ID);
     if (!bar) return;
+    pendingSelText = getSelectionText();
     bar.style.display = 'flex';
     const pad = 8;
     const left = Math.min(window.innerWidth - 200, Math.max(pad, x));
@@ -142,17 +160,36 @@
   function hideBar() {
     const bar = document.getElementById(BAR_ID);
     if (bar) bar.style.display = 'none';
+    pendingSelText = '';
+  }
+
+  function flashToast(msg) {
+    let t = document.getElementById('dwt-snip-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'dwt-snip-toast';
+      t.setAttribute('role', 'status');
+      t.style.cssText = 'position:fixed;z-index:1000000;left:50%;bottom:72px;transform:translateX(-50%);'
+        + 'background:#1f2328;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;'
+        + 'pointer-events:none;opacity:0;transition:opacity .15s;box-shadow:0 4px 14px rgba(0,0,0,.2)';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._dwtHide);
+    t._dwtHide = setTimeout(() => { t.style.opacity = '0'; }, 1400);
   }
 
   function ensureBar() {
-    if (document.getElementById(BAR_ID)) return;
+    // 热重载时重建，保证 click 绑到新闭包（含 pendingSelText）
+    const old = document.getElementById(BAR_ID);
+    if (old) old.remove();
     const bar = document.createElement('div');
     bar.id = BAR_ID;
     bar.innerHTML =
       '<button type="button" data-act="snip">📌 收藏</button>'
-      + '<button type="button" data-act="hl">🖍 高亮</button>'
-      + '<button type="button" data-act="copy">复制</button>';
-    bar.addEventListener('mousedown', (e) => e.preventDefault()); // 保住选区
+      + '<button type="button" data-act="hl">🖍 高亮</button>';
+    bar.addEventListener('mousedown', (e) => e.preventDefault()); // 尽量保住选区（高亮仍需要 Range）
     bar.addEventListener('click', onBarClick);
     document.body.appendChild(bar);
   }
@@ -160,14 +197,10 @@
   async function onBarClick(e) {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
-    const text = getSelectionText();
+    // 优先用划词展示浮层时缓存的文本；选区被豆包清掉时 live getSelection 为空
+    const text = (pendingSelText || getSelectionText()).trim();
     if (!text) { hideBar(); return; }
     const act = btn.dataset.act;
-    if (act === 'copy') {
-      try { await navigator.clipboard.writeText(text); } catch (_) {}
-      hideBar();
-      return;
-    }
     if (act === 'snip') {
       snippets.unshift({
         id: Date.now().toString(36),
@@ -176,12 +209,15 @@
         at: Date.now(),
       });
       await saveSnippets();
+      const panel = document.getElementById(PANEL_ID);
+      if (panel) panel.style.display = 'block';
       renderPanel();
+      flashToast('已收藏到语料板');
       hideBar();
       return;
     }
     if (act === 'hl') {
-      applyHighlight(text, 'dwt-hl');
+      const ok = applyHighlight(text, 'dwt-hl');
       const id = chatId();
       if (!highlights[id]) highlights[id] = [];
       const h = hashText(text);
@@ -189,23 +225,166 @@
         highlights[id].push({ hash: h, text: text.slice(0, 500), color: 'dwt-hl' });
         await saveHighlights();
       }
+      if (ok) flashToast('已高亮');
+      else flashToast('高亮失败：请重选文字');
       hideBar();
     }
   }
 
+  function makeMark(colorClass) {
+    const mark = document.createElement('mark');
+    mark.className = colorClass || 'dwt-hl';
+    mark.dataset.dwtHl = '1';
+    return mark;
+  }
+
   function applyHighlight(text, colorClass) {
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    try {
-      const range = sel.getRangeAt(0);
-      const mark = document.createElement('mark');
-      mark.className = colorClass || 'dwt-hl';
-      mark.dataset.dwtHl = '1';
-      range.surroundContents(mark);
-      sel.removeAllRanges();
-    } catch (_) {
-      // 跨复杂节点时 surroundContents 可能失败，忽略
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      try {
+        const range = sel.getRangeAt(0);
+        const mark = makeMark(colorClass);
+        try {
+          range.surroundContents(mark);
+        } catch (_) {
+          // 跨 span/公式等复杂节点时 surroundContents 会抛错；改为抽内容再包一层
+          const frag = range.extractContents();
+          mark.appendChild(frag);
+          range.insertNode(mark);
+        }
+        sel.removeAllRanges();
+        return true;
+      } catch (_) { /* fall through to text restore */ }
     }
+    // 选区被豆包清掉时：用缓存文本在页面里定位并包裹
+    if (text) return restoreOneHighlight(text, colorClass || 'dwt-hl');
+    return false;
+  }
+
+  function alreadyHighlighted(text) {
+    const needle = String(text || '');
+    if (!needle) return false;
+    const marks = document.querySelectorAll('mark[data-dwt-hl="1"]');
+    for (let i = 0; i < marks.length; i++) {
+      if ((marks[i].textContent || '').indexOf(needle) !== -1) return true;
+    }
+    return false;
+  }
+
+  /** 在消息区按纯文本定位并包一层 mark（刷新后从 storage 恢复） */
+  function restoreOneHighlight(text, colorClass) {
+    const needle = String(text || '').trim();
+    if (!needle || alreadyHighlighted(needle)) return false;
+    const roots = document.querySelectorAll(
+      '[class*="message"], [class*="conversation"], [class*="chat-"], main, #root'
+    );
+    const rootsList = roots.length ? Array.from(roots) : [document.body];
+    for (let r = 0; r < rootsList.length; r++) {
+      if (wrapFirstTextMatch(rootsList[r], needle, colorClass)) return true;
+    }
+    return wrapFirstTextMatch(document.body, needle, colorClass);
+  }
+
+  function wrapFirstTextMatch(root, needle, colorClass) {
+    if (!root || !needle) return false;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node || !node.nodeValue) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (p.closest('mark[data-dwt-hl="1"]')) return NodeFilter.FILTER_REJECT;
+        if (p.closest('#' + BAR_ID) || p.closest('#' + PANEL_ID)) return NodeFilter.FILTER_REJECT;
+        if (p.closest('.ProseMirror') || p.closest('[contenteditable="true"]')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    // 单 text 节点内命中
+    let n;
+    while ((n = walker.nextNode())) {
+      const val = n.nodeValue;
+      const idx = val.indexOf(needle);
+      if (idx === -1) continue;
+      try {
+        const range = document.createRange();
+        range.setStart(n, idx);
+        range.setEnd(n, idx + needle.length);
+        const mark = makeMark(colorClass);
+        range.surroundContents(mark);
+        return true;
+      } catch (_) { /* try next */ }
+    }
+    // 跨 text 节点：拼 contiguous 再 range
+    return wrapAcrossTextNodes(root, needle, colorClass);
+  }
+
+  function wrapAcrossTextNodes(root, needle, colorClass) {
+    const nodes = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node || !node.nodeValue) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        if (!p || p.closest('mark[data-dwt-hl="1"]')) return NodeFilter.FILTER_REJECT;
+        if (p.closest('#' + BAR_ID) || p.closest('#' + PANEL_ID)) return NodeFilter.FILTER_REJECT;
+        if (p.closest('.ProseMirror') || p.closest('[contenteditable="true"]')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    let flat = '';
+    const map = []; // flat index → { node, offset }
+    for (let i = 0; i < nodes.length; i++) {
+      const t = nodes[i].nodeValue;
+      for (let j = 0; j < t.length; j++) {
+        map.push({ node: nodes[i], offset: j });
+      }
+      flat += t;
+    }
+    const idx = flat.indexOf(needle);
+    if (idx === -1) return false;
+    const start = map[idx];
+    const end = map[idx + needle.length - 1];
+    if (!start || !end) return false;
+    try {
+      const range = document.createRange();
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset + 1);
+      const mark = makeMark(colorClass);
+      try {
+        range.surroundContents(mark);
+      } catch (_) {
+        const frag = range.extractContents();
+        mark.appendChild(frag);
+        range.insertNode(mark);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function restoreHighlights() {
+    const id = chatId();
+    const list = [].concat(highlights[id] || [], id !== 'global' ? (highlights.global || []) : []);
+    let applied = 0;
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      if (!item || !item.text) continue;
+      if (restoreOneHighlight(item.text, item.color || 'dwt-hl')) applied += 1;
+    }
+    return applied;
+  }
+
+  function scheduleRestoreHighlights() {
+    // 豆包消息异步渲染：挂载后多轮重试
+    const delays = [0, 400, 1200, 3000, 6000];
+    delays.forEach((ms) => setTimeout(() => {
+      try { restoreHighlights(); } catch (_) {}
+    }, ms));
   }
 
   function ensurePanel() {
@@ -340,10 +519,28 @@
     document.addEventListener('mouseup', onMouseUp, true);
     bindLatex();
     setInterval(bindLatex, 3000);
+    scheduleRestoreHighlights();
+  }
+
+  function hotReload() {
+    injectStyles();
+    ensureBar();
+    loadStore().then(() => scheduleRestoreHighlights());
+  }
+
+  // live-boot / CDP 再 eval：刷新样式并恢复高亮，不重复绑 mouseup
+  if (dwt.selectionToolsModule && dwt.selectionToolsModule._ready) {
+    dwt.selectionToolsModule.hotReload = hotReload;
+    dwt.selectionToolsModule.restoreHighlights = restoreHighlights;
+    dwt.selectionToolsModule.setEnabled = setEnabled;
+    hotReload();
+    console.log('[cs][doubao-web-toolkit] selection-tools hot-reload (#84/#101)');
+    return;
   }
 
   dwt.selectionToolsModule = {
     mount, setEnabled, getSnippets: () => snippets.slice(),
+    restoreHighlights, hotReload, _ready: true,
   };
 
   loadStore().then(mount);
