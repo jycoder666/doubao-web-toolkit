@@ -1,0 +1,75 @@
+{
+  "manifest_version": 3,
+  "name": "Doubao Web Toolkit",
+  "short_name": "doubao-toolkit",
+  "version": "0.4.2",
+  "description": "Chrome/Edge extension for doubao.com: 配置页、批量输入+验证码暂停、对话导出、选择器注册表",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Doubao Web Toolkit · 配置",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://www.doubao.com/*",
+    "https://www.dola.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.doubao.com/*",
+        "https://www.dola.com/*"
+      ],
+      "css": ["content/styles/common.css"],
+      "run_at": "document_idle",
+      "js": [
+        "content/core/selector-manager.js",
+        "content/core/dom-observer.js",
+        "content/core/reply-state.js",
+        "content/core/captcha-detector.js",
+        "content/core/help-tip.js",
+        "content/core/ui-rail.js",
+        "content/core/panel-drag.js",
+        "content/features/batch-input/runner.js",
+        "content/features/debug-panel/module.js",
+        "content/features/export/module.js",
+        "content/features/theme/module.js",
+        "content/features/prompt-bar/module.js",
+        "content/features/navigator/module.js",
+        "content/features/enhance/module.js",
+        "content/features/source-inspector/module.js",
+        "content/features/input-enhance/module.js",
+        "content/features/conversation-manager/module.js",
+        "content/features/reading-mark/module.js",
+        "content/features/chat-digest/module.js",
+        "content/features/reply-outline/module.js",
+        "content/features/selection-tools/module.js",
+        "content/features/rec-blocker/module.js",
+        "content/features/vibe/module.js",
+        "content/features/float-panel/module.js",
+        "content/features/page-comfort/module.js",
+        "content/features/keyword-spark/module.js",
+        "content/features/context-lines/module.js",
+        "content/features/arxiv-prompt/module.js",
+        "content/features/batch-input/module.js",
+        "content/features/batch-input/panel.js",
+        "content/content-loader.js"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  }
+}

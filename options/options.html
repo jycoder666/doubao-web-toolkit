@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doubao Web Toolkit · 配置</title>
+  <link rel="stylesheet" href="../assets/tokens.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+
+<body>
+  <div class="shell">
+    <div class="wrap">
+      <header class="hero">
+        <div>
+          <h1>Doubao Web Toolkit</h1>
+          <p class="muted">功能开关 · 调试 · 批量问答 · 选择器</p>
+        </div>
+        <div class="hero-actions">
+          <button type="button" id="fold-all" class="btn-ghost" title="全部折叠">全部折叠</button>
+          <button type="button" id="expand-all" class="btn-ghost" title="全部展开">全部展开</button>
+          <button type="button" id="open-debug" class="btn-secondary">打开调试面板</button>
+          <button type="button" id="save" class="btn-primary">保存</button>
+        </div>
+      </header>
+      <div id="msg" class="toast" aria-live="polite"></div>
+
+      <div class="main-scroll" id="main-scroll">
+      <details class="card" id="sec-read" data-toc="阅读与会话">
+        <summary class="card-sum">
+          <span class="card-title">阅读与会话</span>
+          <span class="card-meta">来源 · 对话管理 · 阅读标记 · 摘要 · 大纲 · 语料</span>
+        </summary>
+        <div class="card-body">
+          <div class="feat-grid">
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">联网来源标注<span class="tip" data-tip="开启后：① 在每条 AI 回复下方自动扫描正文中的链接；② 为链接编号并显示「来源 1/2/3」蓝色徽标；③ 按域名给出可信度分级（官方/媒体/其他）；④ 徽标点击可展开原始链接。关闭后所有徽标与扫描结果立即移除。">ⓘ</span></span><input type="checkbox" id="feat-source"></span>
+              <span class="feat-desc">回复旁「来源 N」徽标 + 可信度</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">对话管理<span class="tip" data-tip="开启后：① 左侧会话列表每项出现勾选框，可多选；② 顶部出现「删除所选」「全选」操作条；③ 支持批量删除会话（删除不可恢复，请谨慎操作）。关闭后勾选框与操作条消失，会话列表恢复原生状态。">ⓘ</span></span><input type="checkbox" id="feat-conv"></span>
+              <span class="feat-desc">会话批量勾选删除（默认关）</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">阅读位置标记<span class="tip" data-tip="开启后：① 自动记录你在每个会话读到的那一条用户提问；② 重开会话时顶部提示「上次读到第 N 条」，可一键跳回。关闭后停止记录与提示。">ⓘ</span></span><input type="checkbox" id="feat-readmark"></span>
+              <span class="feat-desc">记住阅读位置，重开可跳回</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">对话摘要<span class="tip" data-tip="开启后：右下角「🧾」生成 Markdown 提纲，可复制/下载，零网络请求。关闭后按钮与面板移除。">ⓘ</span></span><input type="checkbox" id="feat-digest"></span>
+              <span class="feat-desc">本地提纲摘要（默认关）</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">回复大纲<span class="tip" data-tip="开启后：右侧固定大纲，随当前 AI 回复更新，点击跳转小节。纯文本无标题则不显示。关闭后面板移除。">ⓘ</span></span><input type="checkbox" id="feat-outline"></span>
+              <span class="feat-desc">右侧大纲目录（默认开）</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">语料板 / 高亮<span class="tip" data-tip="开启后：划词可收藏进语料板或正文高亮；右下角「📌」打开语料板，点条目插入输入框；公式悬停可复制 LaTeX。关闭后隐藏。">ⓘ</span></span><input type="checkbox" id="feat-selection"></span>
+              <span class="feat-desc">划词收藏 + 高亮 + LaTeX</span>
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" id="sec-write" data-toc="输入与创作">
+        <summary class="card-sum">
+          <span class="card-title">输入与创作</span>
+          <span class="card-meta">输入增强 · 英语拆行 · 论文提示 · 视觉关键词</span>
+        </summary>
+        <div class="card-body">
+          <div class="feat-grid">
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">输入增强<span class="tip" data-tip="开启后：① 输入框改为 Ctrl(⌘)+Enter 发送、单独 Enter 换行（默认相反）；② 自动记忆你上次选择的模型，刷新或新开会话时自动切回该模型。关闭后恢复豆包原生按键行为，不再记忆模型。">ⓘ</span></span><input type="checkbox" id="feat-input"></span>
+              <span class="feat-desc">Ctrl+Enter 发送 / 记忆模型</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">英语拆行<span class="tip" data-tip="开启后：选中英文弹出拆行卡片，可插入解释提示。默认关闭。">ⓘ</span></span><input type="checkbox" id="feat-context"></span>
+              <span class="feat-desc">选中英语拆行解释</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">论文解读提示<span class="tip" data-tip="开启后：右侧 arXiv 输入条，识别编号后插入中文解读提纲。不抓取论文。默认关闭。">ⓘ</span></span><input type="checkbox" id="feat-arxiv"></span>
+              <span class="feat-desc">arXiv 解读提示（默认关）</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">视觉关键词<span class="tip" data-tip="开启后：把中文主题拼成视觉检索词，点击复制。不访问外站。默认关闭。">ⓘ</span></span><input type="checkbox" id="feat-spark"></span>
+              <span class="feat-desc">本地生成检索词（默认关）</span>
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" id="sec-ui" data-toc="界面与效率">
+        <summary class="card-sum">
+          <span class="card-title">界面与效率</span>
+          <span class="card-meta">推荐屏蔽 · 氛围 · 便签 · 宽屏 · 调试模块</span>
+        </summary>
+        <div class="card-body">
+          <div class="feat-grid">
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">首页推荐屏蔽<span class="tip" data-tip="开启后：用 CSS 隐藏豆包首页建议/推荐区块。关闭后恢复显示。">ⓘ</span></span><input type="checkbox" id="feat-rec"></span>
+              <span class="feat-desc">隐藏首页推荐卡片（默认开）</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">背景氛围<span class="tip" data-tip="开启后：可在五套渐变氛围间切换；仅 CSS 层。默认关闭。">ⓘ</span></span><input type="checkbox" id="feat-vibe"></span>
+              <span class="feat-desc">五套背景预设（默认关）</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">悬浮便签<span class="tip" data-tip="开启后：可拖拽/缩放本地便签；Ctrl+Shift+H 显隐。默认关闭。">ⓘ</span></span><input type="checkbox" id="feat-float"></span>
+              <span class="feat-desc">本地便签 · Ctrl+Shift+H</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">宽屏与折叠<span class="tip" data-tip="开启后：宽屏布局 + 长回复默认折叠。默认关闭。">ⓘ</span></span><input type="checkbox" id="feat-comfort"></span>
+              <span class="feat-desc">宽屏 + 长回复折叠</span>
+            </label>
+            <label class="feat">
+              <span class="feat-top"><span class="feat-name">调试面板模块<span class="tip" data-tip="开启后：可在本页点「打开调试面板」在豆包页展开选择器表与实时状态。关闭后仍可打开本配置页（右下角 ⚙ / 扩展图标）。">ⓘ</span></span><input type="checkbox" id="feat-debug"></span>
+              <span class="feat-desc">页内调试面板能力（默认开）</span>
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" id="sec-batch" data-toc="批量问答">
+        <summary class="card-sum">
+          <span class="card-title">批量问答</span>
+          <span class="card-meta">间隔 · 超时</span>
+        </summary>
+        <div class="card-body">
+          <div class="num-row">
+            <label>间隔（秒）<input type="number" id="min-interval" value="3" min="0" step="1"></label>
+            <label>回复超时（秒）<input type="number" id="reply-timeout" value="180" min="10" step="10"></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" id="sec-dev" data-toc="开发">
+        <summary class="card-sum">
+          <span class="card-title">开发</span>
+          <span class="card-meta">热重载</span>
+        </summary>
+        <div class="card-body">
+          <label class="feat feat-wide">
+            <span class="feat-top"><span class="feat-name">开发热重载<span class="tip tip-down" data-tip="仅开发时使用。开启后周期性比对源码指纹，改动后自动重载扩展并刷新豆包页。正式使用请关闭。">ⓘ</span></span><input type="checkbox" id="dev-hot-reload"></span>
+            <span class="feat-desc">改源码后自动重载（默认关）</span>
+          </label>
+        </div>
+      </details>
+
+      <details class="card" id="sec-sel" data-toc="DOM 选择器">
+        <summary class="card-sum">
+          <span class="card-title">DOM 选择器覆盖</span>
+          <span class="card-meta">改版兜底 · JSON 导入</span>
+        </summary>
+        <div class="card-body">
+          <p class="sec-desc sec-desc-keep">豆包改版找不到元素时在此覆盖。悬停键名可见默认值；留空保存 = 回落默认。保存后刷新豆包页生效。</p>
+          <div id="sel-editor"></div>
+          <div class="sel-toolbar">
+            <button type="button" id="sel-reset-all">全部重置</button>
+            <span class="muted">清空全部覆盖（再点一次确认）</span>
+          </div>
+          <details class="sel-json-details">
+            <summary>JSON 高级导入 / 备份</summary>
+            <div class="sel-json-help">
+              <p>把上方各键的<strong>覆盖值</strong>整包备份或从别处粘贴回来，写入存储键 <code>dwt_selectors</code>。日常改选择器请用上面的逐行编辑；这里只适合批量迁移。</p>
+              <p><strong>格式</strong>：一个 JSON 对象。键必须是已有选择器名（未知键会拒绝）；值为字符串，或字符串数组（多选用逗号/换行也行）。空字符串 / 空数组 = 该键回落默认。函数型键（如 <code>sendMatch</code>）不能写在这里。</p>
+              <pre class="sel-json-example" aria-label="example">&#123;
+  "input": ".ProseMirror",
+  "userBubble": "[class*=\"bg-g-send-msg-bubble-bg\"]",
+  "generatingSelectors": ["[class*=\"thinking\" i]", "[class*=\"streaming\" i]"]
+&#125;</pre>
+              <p class="muted">文本框默认显示当前覆盖（无覆盖时为 <code>{}</code>）。改完点「导入」；导入成功后刷新豆包页生效。</p>
+            </div>
+            <textarea id="sel-json" rows="8" spellcheck="false" placeholder="{ &quot;input&quot;: &quot;.ProseMirror&quot; }"></textarea>
+            <button type="button" id="sel-json-apply">导入</button>
+          </details>
+        </div>
+      </details>
+      </div>
+    </div>
+
+    <aside class="toc" id="opt-toc" aria-label="分区导航">
+      <div class="toc-title">分区导航</div>
+      <nav class="toc-nav" id="toc-nav"></nav>
+    </aside>
+  </div>
+  <script src="../content/core/selector-manager.js"></script>
+  <script src="options.js"></script>
+</body>
+
+</html>

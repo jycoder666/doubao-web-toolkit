@@ -1,0 +1,42 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+.debug-profile/
+.git-commit-msg.tmp
+dev/.preview-storage.json
+dev/.verify-last.json
+dev/.last-nav-align.json
+dev/.serve-access.log
+dev/.accept-*
+dev/.ui-verify-poll.json
+dev/._*
+dev/__pycache__/
+dev/_inj_chunks/
+git-pull.bat
+git-pull.token
+git-pull.content.txt
+
+# IDE / 编辑器本地配置目录（不入库）
+.cursor/
+.idea/
+.lingma/
+.trae/
+.vscode/
+.workbuddy/
+
+# 开发调试目录与内部管理文件（不入库）
+dev/
+GOAL.md
+PROJECT_STATUS.md
+
+# 依赖与构建产物（不入库）
+dist/
+build/
+
+# GitHub 配置目录
+.github/
+
+.env
+__pycache__/
+*.bat

@@ -1,0 +1,87 @@
+.dwt-hidden { display: none !important; }
+.dwt-panel { position: fixed; z-index: 999999; font-size: 12px; }
+
+/* ---------- 注入 UI 统一设计变量 (浅色默认, html.dwt-ui-dark 翻转) ---------- */
+/* html.dwt-ui-dark 由 theme/module.js 按豆包外观（html[data-theme] / localStorage['dbx-web-theme']）打上，
+   模块内联样式也统一引用这些变量，别处不要再硬编码白底/黑字。 */
+:root {
+  --dwt-bg: #ffffff;
+  --dwt-fg: #1f2328;
+  --dwt-border: #d0d7de;
+  --dwt-soft: #f6f8fa;
+  --dwt-muted: #8b949e;
+  --dwt-accent: #2d72de;
+  --dwt-hover: #e8f0ff;
+  --dwt-chip-bg: #ddf4ff;
+  --dwt-toast-bg: #1f2328;
+  --dwt-toast-fg: #ffffff;
+}
+html.dwt-ui-dark {
+  --dwt-bg: #1f2430;
+  --dwt-fg: #e6e8ee;
+  --dwt-border: #3a4150;
+  --dwt-soft: #262c38;
+  --dwt-muted: #9aa4b2;
+  --dwt-hover: #2a3550;
+  --dwt-chip-bg: #1d3a5f;
+  --dwt-toast-bg: #e6e8ee;
+  --dwt-toast-fg: #1f2328;
+}
+
+/* ---------- 深色模式: 注入面板统一适配 ----------
+   各面板历史样式为白底硬编码, 用 !important 压过; 变量随 dwt-ui-dark 自动切换。
+   例外: #dwt-prompt-bar（快捷回复）自己就用 --dwt-* 变量写样式, 不能进这批 !important 列表 —— 
+   它的容器是无底色的布局盒, 被刷上 --dwt-bg 会凭空多一个方块, 按钮配色也会被压成 --dwt-soft。
+   同理: #dwt-vibe-presets（背景氛围预设色板）挂在 rail 菜单内, 底色/描边自持, 不进列表。 */
+html.dwt-ui-dark #dwt-debug-panel,
+html.dwt-ui-dark #dwt-conv-bar,
+html.dwt-ui-dark #dwt-digest-panel,
+html.dwt-ui-dark #dwt-snip-panel,
+html.dwt-ui-dark #dwt-sel-bar,
+html.dwt-ui-dark #dwt-src-panel,
+html.dwt-ui-dark #dwt-ctx-card,
+html.dwt-ui-dark #dwt-spark-root,
+html.dwt-ui-dark #dwt-batch-panel,
+html.dwt-ui-dark #dwt-arxiv-root,
+html.dwt-ui-dark #dwt-float-root {
+  background: var(--dwt-bg) !important;
+  color: var(--dwt-fg) !important;
+  border-color: var(--dwt-border) !important;
+}
+
+/* 面板内的输入框 / 按钮 / 表格行 */
+html.dwt-ui-dark #dwt-debug-panel input,
+html.dwt-ui-dark #dwt-debug-panel select,
+html.dwt-ui-dark #dwt-debug-panel details,
+html.dwt-ui-dark #dwt-conv-bar button,
+html.dwt-ui-dark #dwt-digest-panel button,
+html.dwt-ui-dark #dwt-snip-panel .dwt-snip-item,
+html.dwt-ui-dark #dwt-snip-panel .dwt-snip-actions button,
+html.dwt-ui-dark #dwt-sel-bar button,
+html.dwt-ui-dark #dwt-src-panel button,
+html.dwt-ui-dark #dwt-src-panel .dwt-src-row,
+html.dwt-ui-dark #dwt-digest-panel pre,
+html.dwt-ui-dark #dwt-ctx-card button,
+html.dwt-ui-dark #dwt-spark-root input,
+html.dwt-ui-dark #dwt-spark-root button,
+html.dwt-ui-dark #dwt-debug-panel #dwt-pick {
+  background: var(--dwt-soft) !important;
+  color: var(--dwt-fg) !important;
+  border-color: var(--dwt-border) !important;
+}
+html.dwt-ui-dark #dwt-debug-panel label,
+html.dwt-ui-dark #dwt-debug-panel div,
+html.dwt-ui-dark #dwt-conv-bar div,
+html.dwt-ui-dark #dwt-conv-bar button:hover,
+html.dwt-ui-dark #dwt-sel-bar button:hover {
+  color: var(--dwt-fg) !important;
+}
+/* 语料板条目的元信息（时间/来源）保持弱化色 —— 上面那批是刷正文色的，
+   别把它一起刷亮，否则深色下层级全糊在一起。 */
+html.dwt-ui-dark #dwt-snip-panel .dwt-snip-meta {
+  color: var(--dwt-muted) !important;
+}
+html.dwt-ui-dark #dwt-snip-panel .dwt-snip-item:hover {
+  background: #2a3550 !important;
+  border-color: var(--dwt-accent) !important;
+}

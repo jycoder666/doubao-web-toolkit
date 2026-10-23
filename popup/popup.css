@@ -1,0 +1,20 @@
+body { width: var(--ext-panel-width, 280px); margin: 0; padding: 12px; font-family: var(--ext-font-family, -apple-system, "Segoe UI", Roboto, sans-serif); font-size: var(--ext-font, 13px); color: var(--ext-color-text, #1a1a1a); }
+h1 { margin: 0 0 8px; font-size: 14px; color: #1a1a1a; }
+.section { display: flex; gap: var(--ext-gap, 6px); flex-wrap: wrap; flex-direction: column; margin-bottom: 12px; }
+.section-title { font-size: 11px; color: #666; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+button { padding: 6px 10px; border: 1px solid var(--ext-color-border, #d0d7de); border-radius: var(--ext-radius, 6px); background: #fff; cursor: pointer; font-size: 12px; width: 100%; box-sizing: border-box; }
+button:hover { background: #f6f8fa; }
+button.primary { background: #2d72de; color: #fff; border-color: #2d72de; }
+button.primary:hover { background: #1f5ec4; }
+button.on { background: #e6f4ea; color: #1a7f37; border-color: #a8d5b5; font-weight: 600; }
+/* 开启态勾选标记用 ::before, 避免与 .tip 的 ::after 浮层冲突 */
+button.on::before { content: "✓ "; }
+.muted { color: #666; font-size: 11px; min-height: 14px; }
+
+/* 工具按钮提示: 悬停时在按钮下方浮层说明开启后的具体变化 */
+/* 用 display:none / display:block 切换, 而非 visibility:hidden ——
+   隐藏的绝对定位伪元素仍会计入 scrollHeight, 会撑出幻影滚动条 */
+.section { position: relative; }
+button.tip { position: relative; }
+button.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); width: 100%; box-sizing: border-box; padding: 8px 10px; background: #24292f; color: #fff; font-size: 11px; line-height: 1.6; font-weight: 400; text-align: left; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.28); white-space: normal; display: none; z-index: 30; pointer-events: none; }
+button.tip:hover::after { display: block; }
