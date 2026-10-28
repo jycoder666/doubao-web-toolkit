@@ -52,6 +52,21 @@
 
   function load() {
     if (loaded) return Promise.resolve(posMap);
+    // 先读 localStorage 同步兜底（IAB 下 chrome.storage 可能延迟/失败）
+    try {
+      const ls = localStorage.getItem(KEY);
+      if (ls) {
+        const v = JSON.parse(ls);
+        if (v && typeof v === 'object') {
+          Object.keys(v).forEach((k) => {
+            const p = v[k];
+            if (p && typeof p.left === 'number' && typeof p.top === 'number') {
+              posMap[k] = { left: p.left, top: p.top, w: p.w || 0, h: p.h || 0 };
+            }
+          });
+        }
+      }
+    } catch (_) {}
     return Promise.resolve()
       .then(() => chrome.storage.local.get(KEY))
       .then((r) => {
@@ -84,16 +99,23 @@
       const gone = [];
       dirty.forEach((k) => { if (posMap[k]) patch[k] = posMap[k]; else gone.push(k); });
       dirty.clear();
+      // 直接用 .then() 链，不用 Promise.resolve 包装（IAB 下包装后的 thenable 可能丢失回调）
       try {
-        Promise.resolve(chrome.storage.local.get(KEY))
+        chrome.storage.local.get(KEY)
           .then((r) => {
             const cur = (r && r[KEY] && typeof r[KEY] === 'object') ? Object.assign({}, r[KEY]) : {};
             Object.keys(patch).forEach((k) => { cur[k] = patch[k]; });
             gone.forEach((k) => { delete cur[k]; });
             return chrome.storage.local.set({ [KEY]: cur });
           })
-          .catch(() => {});
-      } catch (_) {}
+          .catch((err) => {
+            // get 失败时直接写 patch（避免整份丢失）
+            console.warn('[dwt-drag] persist get failed, writing patch directly:', err);
+            chrome.storage.local.set({ [KEY]: patch }).catch(() => {});
+          });
+      } catch (e) {
+        console.warn('[dwt-drag] persist error:', e);
+      }
     }, SAVE_MS);
   }
 
@@ -169,6 +191,9 @@
       if (!moved) return;
       posMap[b.key] = { left: cur.left, top: cur.top, w: Math.round(w), h: Math.round(h) };
       persist(b.key);
+      // 同步兜底：IAB 下 setTimeout 回调可能不触发，直接写 localStorage + chrome.storage
+      try { localStorage.setItem(KEY, JSON.stringify(posMap)); } catch (_) {}
+      try { chrome.storage.local.set({ [KEY]: posMap }).catch(() => {}); } catch (_) {}
       if (typeof b.onEnd === 'function') { try { b.onEnd(cur); } catch (_) {} }
     }
 

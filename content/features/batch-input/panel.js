@@ -378,6 +378,7 @@
         overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
         border:1px solid var(--dwt-border,#d0d7de); background:var(--dwt-bg,#fff);
         color:var(--dwt-muted,#8b949e); cursor:default;
+        box-sizing:border-box; display:inline-block;
       }
       #${PANEL_ID} .qi .qprev {
         flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
