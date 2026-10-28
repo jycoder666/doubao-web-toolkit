@@ -1,0 +1,43 @@
+javascript:(function(){
+  if(window.__dwtAutoInject) return;
+  window.__dwtAutoInject = true;
+  function applyLayoutFix(){
+    if(document.getElementById('dwt-desktop-layout-fix')) return;
+    var s=document.createElement('style');
+    s.id='dwt-desktop-layout-fix';
+    s.textContent='nav.panel-fvxXfj{position:fixed!important;left:0!important;top:0!important;width:280px!important;height:100vh!important;overflow:hidden!important;z-index:50}#chat-route-main{margin-left:280px!important;width:calc(100vw - 280px)!important}#chat-route-layout > aside{display:none!important}';
+    document.head.appendChild(s);
+  }
+  function enableSnip(){
+    try{
+      var mod = window.dwt && window.dwt.selectionToolsModule;
+      if(!mod) return false;
+      if(!window.dwt._selToolsState?.enabled) mod.setEnabled(true);
+      return true;
+    }catch(_){ return false; }
+  }
+  function inject(){
+    if(window.__dwtLiveBoot){ enableSnip(); applyLayoutFix(); return; }
+    window.__dwtLiveBoot=true;
+    fetch('http://127.0.0.1:5179/dev/live-boot.js',{cache:'no-store'})
+      .then(function(r){return r.text();})
+      .then(function(t){
+        (0,eval)(t);
+        applyLayoutFix();
+        // 长轮询启用划词：loadStore() 异步完成可能把 S.enabled 设回 false，
+        // 持续重试直到确认 enabled=true
+        var polls = 0;
+        function tryEnable(){
+          var ok = enableSnip();
+          // 确认 enabled 真的设上了才停
+          if(ok && window.dwt._selToolsState?.enabled) return;
+          if(polls < 60){ polls++; setTimeout(tryEnable, 500); }
+        }
+        setTimeout(tryEnable, 500);
+      })
+      .catch(function(){ window.__dwtLiveBoot=false; });
+  }
+  if(document.readyState==='complete'||document.readyState==='interactive') inject();
+  else window.addEventListener('DOMContentLoaded',inject);
+  setInterval(function(){ if(!window.__dwtLiveBoot&&document.readyState==='complete') inject(); },3000);
+})();
