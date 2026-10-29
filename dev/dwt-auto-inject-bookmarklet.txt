@@ -11,10 +11,8 @@ javascript:(function(){
   function enableSnip(){
     try{
       var mod = window.dwt && window.dwt.selectionToolsModule;
-      if(!mod) return false;
-      if(!window.dwt._selToolsState?.enabled) mod.setEnabled(true);
-      return true;
-    }catch(_){ return false; }
+      if(mod) mod.setEnabled(true);
+    }catch(_){}
   }
   function inject(){
     if(window.__dwtLiveBoot){ enableSnip(); applyLayoutFix(); return; }
@@ -24,16 +22,15 @@ javascript:(function(){
       .then(function(t){
         (0,eval)(t);
         applyLayoutFix();
-        // 长轮询启用划词：loadStore() 异步完成可能把 S.enabled 设回 false，
-        // 持续重试直到确认 enabled=true
-        var polls = 0;
-        function tryEnable(){
-          var ok = enableSnip();
-          // 确认 enabled 真的设上了才停
-          if(ok && window.dwt._selToolsState?.enabled) return;
-          if(polls < 60){ polls++; setTimeout(tryEnable, 500); }
-        }
-        setTimeout(tryEnable, 500);
+        // 源码已修复 _explicitEnabled 标志：直接调用 setEnabled(true)
+        enableSnip();
+        // 持续重试 30 秒确保 loadStore() 完成后不覆盖
+        var n = 0;
+        var timer = setInterval(function(){
+          enableSnip();
+          n++;
+          if(n >= 60) clearInterval(timer);
+        }, 500);
       })
       .catch(function(){ window.__dwtLiveBoot=false; });
   }

@@ -224,7 +224,7 @@
   async function loadStore() {
     try {
       const r = await chrome.storage.local.get([SNIP_KEY, HL_KEY, FEAT_KEY]);
-      if (r[FEAT_KEY] === false) S.enabled = false;
+      if (r[FEAT_KEY] === false && !S._explicitEnabled) S.enabled = false;
       S.snippets = Array.isArray(r[SNIP_KEY]) ? r[SNIP_KEY] : [];
       S.highlights = r[HL_KEY] && typeof r[HL_KEY] === 'object' ? r[HL_KEY] : {};
     } catch (_) { /* mock / 无 storage */ }
@@ -1074,6 +1074,8 @@
 
   function setEnabled(v) {
     S.enabled = !!v;
+    // 标记外部已显式启用（书签小程序/Agent 调用）：loadStore() 完成后不得覆盖
+    if (S.enabled) S._explicitEnabled = true;
     const panel = document.getElementById(PANEL_ID);
     if (!S.enabled) {
       hideBar();
@@ -1244,7 +1246,9 @@
   // Mount with defaults first — do not block #dwt-snip-toggle on hung storage (Glass→5179).
   mount();
   loadStore().then(function () {
-    if (!S.enabled) setEnabled(false);
+    // 如果外部已显式启用（书签小程序/Agent 调用 setEnabled(true)），
+    // loadStore() 不得覆盖回 false —— 否则 #dwt-snip-toggle 永远不出现
+    if (!S.enabled && !S._explicitEnabled) setEnabled(false);
     else {
       ensureToggle();
       renderPanel();
